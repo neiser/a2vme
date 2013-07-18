@@ -1,12 +1,12 @@
 /*
  *
- *	Copyright (c) 1992, 1994, 2001 by
- *	Johannes Gutenberg-Universitaet Mainz,
- *	Institut fuer Kernphysik, K.W. Krygier
+ *  Copyright (c) 1992, 1994, 2001 by
+ *  Johannes Gutenberg-Universitaet Mainz,
+ *  Institut fuer Kernphysik, K.W. Krygier
  *
- *	All rights reserved.
+ *  All rights reserved.
  *
- *	@(#)vmebus.h	12.1 KPH (K.W. Krygier) 94/10/29 96/08/23
+ *  @(#)vmebus.h  12.1 KPH (K.W. Krygier) 94/10/29 96/08/23
  *
  */
 
@@ -16,20 +16,20 @@
 #include <stddef.h>
 #include <sys/types.h>
 
-#define VMESIOOFFSET	0xffff0000
-#define	VMESTDOFFSET	0xff000000
-#define VMEBUSPC_STDOFFSET	0x9e000000
-#define VMEBUSPC_EXTOFFSET	0x80000000
-#define VMEBUSPC_SIOOFFSET	0x9f000000
+#define VMESIOOFFSET  0xffff0000
+#define VMESTDOFFSET  0xff000000
+#define VMEBUSPC_STDOFFSET  0x9e000000
+#define VMEBUSPC_EXTOFFSET  0x80000000
+#define VMEBUSPC_SIOOFFSET  0x9f000000
 
-#define VMEANY		0
-#define VMESTD		1
-#define VMEEXT		2
-#define VMESIO		3
+#define VMEANY    0
+#define VMESTD    1
+#define VMEEXT    2
+#define VMESIO    3
 
-void	*vmebus(int access, off_t padd, size_t size);
-void	*vmestd(off_t padd, size_t size);
-void	*vmeext(off_t padd, size_t size);
-void	*vmesio(off_t padd, size_t size);
+void  *vmebus(int access, off_t padd, size_t size);
+void  *vmestd(off_t padd, size_t size);
+void  *vmeext(off_t padd, size_t size);
+void  *vmesio(off_t padd, size_t size);
 
 #endif
