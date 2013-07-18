@@ -1,0 +1,8 @@
+# standard cmake build directory
+/build*/
+
+# no ASCII bitfiles
+*.rbt
+
+# no logs
+*.log
