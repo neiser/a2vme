@@ -5,10 +5,7 @@
 
 void warte(volatile d);
 
-int
-main(argc, argv)
-int argc;
-char *argv[];
+int main(int argc, char *argv[])
 {
   int i;
   unsigned long addr, rest;
@@ -74,8 +71,7 @@ char *argv[];
 
 }
 
-void warte(d)
-volatile d;
+void warte(volatile d)
 {
   while (d) {
     d--;

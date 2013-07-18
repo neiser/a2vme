@@ -7,8 +7,7 @@
 
 static int  vmebusFd;
 
-void *
-vmebus(int access, off_t padd, size_t size)
+void* vmebus(int access, off_t padd, size_t size)
 {
   void  *mem;
 
@@ -24,20 +23,17 @@ vmebus(int access, off_t padd, size_t size)
   return (mem);
 }
 
-void *
-vmestd(off_t padd, size_t size)
+void* vmestd(off_t padd, size_t size)
 {
   return (vmebus(VMESTD, padd | VMEBUSPC_STDOFFSET, size));
 }
 
-void *
-vmeext(off_t padd, size_t size)
+void* vmeext(off_t padd, size_t size)
 {
   return (vmebus(VMEEXT, padd | VMEBUSPC_EXTOFFSET, size));
 }
 
-void *
-vmesio(off_t padd, size_t size)
+void* vmesio(off_t padd, size_t size)
 {
   return (vmebus(VMESIO, padd | VMEBUSPC_SIOOFFSET, size));
 }

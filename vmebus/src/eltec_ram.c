@@ -6,10 +6,7 @@
 void warte(volatile d);
 #define DELAY 0   //ca. 80ns (Geode)
 
-int
-main(argc, argv)
-int argc;
-char *argv[];
+main(int argc, char *argv[])
 {
   unsigned long i;
   unsigned int addr;
@@ -127,8 +124,7 @@ char *argv[];
   printf("fertig\n");
 }
 
-void warte(d)
-volatile d;
+void warte(volatile d)
 {
   while (d) {
     d--;

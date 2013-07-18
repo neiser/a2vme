@@ -27,9 +27,9 @@
 #define VMEEXT    2
 #define VMESIO    3
 
-void  *vmebus(int access, off_t padd, size_t size);
-void  *vmestd(off_t padd, size_t size);
-void  *vmeext(off_t padd, size_t size);
-void  *vmesio(off_t padd, size_t size);
+void* vmebus(int access, off_t padd, size_t size);
+void* vmestd(off_t padd, size_t size);
+void* vmeext(off_t padd, size_t size);
+void* vmesio(off_t padd, size_t size);
 
 #endif

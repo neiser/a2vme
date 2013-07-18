@@ -10,11 +10,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <time.h>
+#include <stdbool.h>
 
 
-typedef int bool;
-#define true   (1)
-#define false  (0)
+//typedef int bool;
+//#define true   (1)
+//#define false  (0)
 
 //maximum number of loops while trying to erase flash memory
 #define MAXLOOPS 10
@@ -45,7 +46,7 @@ int timestamp;
 bool quiet;
 
 
-sighandler(l_signal) int l_signal;
+sighandler(int l_signal)
 {
   switch(l_signal) {
   case SIGKILL:

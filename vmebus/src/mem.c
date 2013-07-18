@@ -1,13 +1,11 @@
+#include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
 #include "vmebus.h"
 
 void warte(volatile d);
 
-int
-main(argc, argv)
-int argc;
-char *argv[];
+int main(int argc, char *argv[])
 {
   int i;
   unsigned long addr, rest;
