@@ -1,3 +1,4 @@
+#!/bin/sh
 echo ""
 echo "************************************"
 echo "* Clear Scalers of all modules     *"

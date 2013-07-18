@@ -1,3 +1,4 @@
+#!/bin/sh
 #
 # Restart all VUPROM modules in Tagger rack
 # 
@@ -10,11 +11,11 @@ echo "* Tagger 1209270f                  *"
 echo "************************************"
 echo ""
 
-flash/vuprom3 -r 1
-flash/vuprom3 -r 2
-flash/vuprom3 -r 3
-flash/vuprom3 -r 4
-flash/vuprom3 -r 5
+vuprom3 -r 1
+vuprom3 -r 2
+vuprom3 -r 3
+vuprom3 -r 4
+vuprom3 -r 5
 
 echo "Wait 10 seconds to complete restart."
 sleep 10

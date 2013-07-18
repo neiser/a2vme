@@ -1,3 +1,5 @@
+#!/bin/sh
+
 while true;
 	 do
 		sysctl hw.acpi.thermal.tz0.temperature ;

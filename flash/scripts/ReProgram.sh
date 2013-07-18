@@ -1,3 +1,4 @@
+#!/bin/sh
 echo ""
 echo "************************************"
 echo "* Reprogram all modules            *"
@@ -6,36 +7,36 @@ echo "************************************"
 echo ""
 
 echo "Flashing Module xe1..."
-./vuprom -rew e1 vuprom_input_processor_1211210c.rbt
+vuprom -rew e1 vuprom_input_processor_1211210c.rbt
 echo "completed."
 
 echo "Flashing Module xe2..."
-./vuprom -rew e2 vuprom_input_processor_1211210c.rbt
+vuprom -rew e2 vuprom_input_processor_1211210c.rbt
 echo "completed."
 
 echo "Flashing Module xe3..."
-./vuprom -rew e3 vuprom_input_processor_1211210c.rbt
+vuprom -rew e3 vuprom_input_processor_1211210c.rbt
 echo "completed."
 
 echo "Flashing Module xe4..."
-./vuprom -rew e4 vuprom_input_processor_1211210c.rbt
+vuprom -rew e4 vuprom_input_processor_1211210c.rbt
 echo "completed."
 
 echo "Flashing Module xe5..."
-./vuprom -rew e5 vuprom_input_processor_1211210c.rbt
+vuprom -rew e5 vuprom_input_processor_1211210c.rbt
 echo "completed."
 
 echo "Flashing Module xe6..."
-./vuprom -rew e6 vuprom_input_processor_1211210c.rbt
+vuprom -rew e6 vuprom_input_processor_1211210c.rbt
 echo "completed."
 
 
 echo "Flashing Module xe7..."
-./vuprom -rew e7 vuprom_multiplicity_master_12120364.rbt
+vuprom -rew e7 vuprom_multiplicity_master_12120364.rbt
 echo "completed."
 
 echo "Flashing Module xe8..."
-./vuprom -rew e8 vuprom_coplanarity_master_1211213c.rbt
+vuprom -rew e8 vuprom_coplanarity_master_1211213c.rbt
 echo "completed."
 
 
