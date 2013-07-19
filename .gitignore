@@ -6,3 +6,6 @@
 
 # no logs
 *.log
+
+# QtCreator stuff
+CMakeLists.txt.user
