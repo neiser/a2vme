@@ -7,11 +7,9 @@ void warte(volatile d);
 
 int main(int argc, char *argv[])
 {
-  int i;
   unsigned long addr, rest;
   unsigned long pattern;
   char * rw;
-  int fd;
   volatile unsigned long *poi;
   if (argc != 4) {
     printf("Aufruf = mem  Addr. (Hex) Pattern (Hex) r, w\n");
@@ -25,7 +23,7 @@ int main(int argc, char *argv[])
   rest = addr % 0x1000;
   addr = (addr / 0x1000) * 0x1000;
 
-  if ((poi = vmebus(0, addr, 0x1000)) == NULL) {
+  if ((poi = vmebus(addr, 0x1000)) == NULL) {
     perror("Fehler beim Device oeffnen");
     exit (-1);
   }

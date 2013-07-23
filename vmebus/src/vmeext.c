@@ -7,11 +7,9 @@ void warte(volatile d);
 
 int main(int argc, char *argv[])
 {
-  int i;
   unsigned long addr, rest;
   unsigned long pattern;
-  char * rw;
-  int fd;
+  char* rw;
   volatile unsigned long *poi;
 
   if (argc != 4) {
@@ -24,7 +22,7 @@ int main(int argc, char *argv[])
   rw = argv[3];
 
   // obere 3 Bits setzen via Register 0xaa000000
-  if ((poi = vmebus(0, 0xaa000000, 0x1000)) == NULL) {
+  if ((poi = vmebus(0xaa000000, 0x1000)) == NULL) {
     perror("Fehler beim Device oeffnen");
     exit (-1);
   }

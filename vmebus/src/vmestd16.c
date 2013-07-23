@@ -7,11 +7,9 @@ void warte(volatile d);
 
 int main(int argc, char *argv[])
 {
-  int i;
   unsigned long addr, rest;
   unsigned long pattern;
   char * rw;
-  int fd;
   volatile unsigned short *poi;
 
   if (argc != 4) {
