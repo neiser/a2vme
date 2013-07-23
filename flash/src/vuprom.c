@@ -11,11 +11,7 @@
 #include <fcntl.h>
 #include <time.h>
 #include <stdbool.h>
-
-
-//typedef int bool;
-//#define true   (1)
-//#define false  (0)
+#include <stdint.h>
 
 //maximum number of loops while trying to erase flash memory
 #define MAXLOOPS 10
@@ -25,7 +21,8 @@
 #define RANGELIMIT  0x100000
 #define MAXLEN    132
 #define BS    19
-#define RANGENUMBER 0 //using memory blocks 2 and 3 instead of 0 and 1
+// this definition moved to CMakeLists.txt
+//#define RANGENUMBER 0 //using memory blocks 2 and 3 instead of 0 and 1
 
 #define VME_LENGTH      0x01000000
 #define MODULE_LENGTH 0x01000000
