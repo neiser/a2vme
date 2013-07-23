@@ -208,7 +208,7 @@ int select_range(unsigned long base, int range, bool verbose)
   return (val);
 }
 
-int erase_block(int base, int block, bool verbose)
+int erase_block(intptr_t base, int block, bool verbose)
 {
   unsigned long clockCounter;
   volatile int *addr;
@@ -231,7 +231,7 @@ int erase_block(int base, int block, bool verbose)
 
 }
 
-int prog_flash(int faddr, int data, bool verbose)
+int prog_flash(intptr_t faddr, int data, bool verbose)
 {
   volatile int *addr;
 
@@ -249,7 +249,7 @@ int prog_flash(int faddr, int data, bool verbose)
 
 }
 
-void read_array(int base)
+void read_array(intptr_t base)
 {
   volatile int *addr;
 
@@ -258,7 +258,7 @@ void read_array(int base)
   *addr = 0xff;
 }
 
-void restart(int base,int range)
+void restart(intptr_t base, int range)
 {
   volatile int *reg;
   int d;
@@ -344,7 +344,7 @@ void writeFlashMemory(int moduleNumber, FILE *rbtFile, bool simulate, bool verbo
   volatile int *p_addr;
   int l_count = 0;
   unsigned long vmeaddr, vme_virt_addr;
-  int fbase, line;
+  int line;
   line = 0;
   printlog("writing new program to flash memory", true, !quiet);
 
@@ -353,7 +353,7 @@ void writeFlashMemory(int moduleNumber, FILE *rbtFile, bool simulate, bool verbo
   //    vme_am = 0x09;
 
   vme_virt_addr = (unsigned long)openvme((void *)vmeaddr, VME_LENGTH, verbose);
-  fbase = vme_virt_addr + FLASHBASE;
+  intptr_t fbase = vme_virt_addr + FLASHBASE;
   p_addr = (int *) fbase;
   select_range(vme_virt_addr, 0+RANGENUMBER, verbose);
   // read header
@@ -415,7 +415,7 @@ void writeFlashMemory(int moduleNumber, FILE *rbtFile, bool simulate, bool verbo
       }
       //          printf("word = %x\n",l_word);
       if (!simulate) {
-        prog_flash((int)p_addr,l_word, verbose);
+        prog_flash((intptr_t)p_addr, l_word, verbose);
       }
       p_addr++;
       l_count++;
@@ -462,7 +462,7 @@ bool verifyFlashMemory(int moduleNumber, FILE *rbtFile, bool simulate, bool verb
   int i, j;
   int len;
   int l_word;
-  int fbase;
+  intptr_t fbase;
   int data;
   int bits = 0;
   int err = 0;
@@ -473,7 +473,7 @@ bool verifyFlashMemory(int moduleNumber, FILE *rbtFile, bool simulate, bool verb
   vmeaddr = moduleNumber * MODULE_LENGTH  ;
   vme_virt_addr  = (unsigned long)openvme((void *)vmeaddr, VME_LENGTH, verbose);
   fbase = vme_virt_addr + FLASHBASE;
-  p_addr = (int *) fbase;
+  p_addr = (volatile int *)fbase;
   select_range(vme_virt_addr, 0+RANGENUMBER, verbose);
   rewind(rbtFile);
 
