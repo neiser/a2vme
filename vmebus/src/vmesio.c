@@ -21,14 +21,15 @@ int main(int argc, char *argv[])
   unsigned long rest = addr % 0x1000;
   addr = (addr / 0x1000) * 0x1000;
 
-  volatile unsigned long *poi = vmesio(addr, 0x1000);
+  // maybe add a volatile here again
+  unsigned short *poi = vmesio(addr, 0x1000);
   if (poi == NULL) {
-    perror("Error opening device. Are you root?");
+    perror("Error opening device. Are you root? Msg");
     exit (-1);
   }
 
-  // is that still correct in short IO mode?
-  poi += (rest / 4);
+  // let's see if that works in short IO mode
+  poi += (rest / 2);
 
   if (!strncmp(rw, "w", 2)) {
     *poi = pattern;
