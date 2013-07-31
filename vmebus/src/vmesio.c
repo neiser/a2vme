@@ -21,8 +21,8 @@ int main(int argc, char *argv[])
   unsigned long rest = addr % 0x1000;
   addr = (addr / 0x1000) * 0x1000;
 
-  // maybe add a volatile here again
-  unsigned short *poi = vmesio(addr, 0x1000);
+  // volatile here ensure correct behaviour in loops
+  volatile unsigned short *poi = vmesio(addr, 0x1000);
   if (poi == NULL) {
     perror("Error opening device. Are you root? Msg");
     exit (-1);
