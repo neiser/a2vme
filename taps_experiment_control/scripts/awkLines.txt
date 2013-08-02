@@ -1,0 +1,4 @@
+BEGIN { 
+	FS="=" 
+}
+(NR <= MaxLine) { printf "Value"(NR-1)"="$2"&"} 
