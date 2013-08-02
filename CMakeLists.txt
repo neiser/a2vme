@@ -17,3 +17,4 @@ message(STATUS "*** Install bin to:  " ${EXECUTABLE_OUTPUT_PATH})
 
 add_subdirectory(vmebus/src)
 add_subdirectory(flash/src)
+add_subdirectory(taps_experiment_control/src)
