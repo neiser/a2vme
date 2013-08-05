@@ -1,1 +1,0 @@
-fetch -o httpresult.txt "http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=0&Value0=1.5&Value1=7"
