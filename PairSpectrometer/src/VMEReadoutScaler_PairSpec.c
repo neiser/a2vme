@@ -62,7 +62,7 @@ unsigned long SetTopBits(unsigned long Myaddr) {
 	volatile unsigned long *Mypoi;
 
 	// obere 3 Bits setzen via Register 0xaa000000
-	if ((Mypoi = vmebus(0, 0xaa000000, 0x1000)) == NULL) {
+	if ((Mypoi = vmebus(0xaa000000, 0x1000)) == NULL) {
 		perror("Error opening device.\n");
 		exit (-1);
 	}
