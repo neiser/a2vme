@@ -113,7 +113,7 @@ int main(argc, argv)
 	char str2[40];
 
 	//Node 0 = TAPS
-	sprintf(buffer, "fetch -o httpresult.txt \"http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=0&"); 
+    sprintf(buffer, "wget -O httpresult.txt \"http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=0&");
 	for (i=0;i<32;i++) {
 		sprintf(str2, "Value%i=%u&", i, Values[i]);
 		strcat(buffer, str2);
@@ -123,7 +123,7 @@ int main(argc, argv)
 	system(buffer);
 
 	//Node 1 = CB
-	sprintf(buffer, "fetch -o httpresult.txt \"http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=1&"); 
+    sprintf(buffer, "wget -O httpresult.txt \"http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=1&");
 	for (i=0;i<32;i++) {
 		sprintf(str2, "Value%i=%u&", i, Values[i+32]);
 		strcat(buffer, str2);
@@ -134,5 +134,5 @@ int main(argc, argv)
 
 
 
-	//system("fetch -o httpresult.txt \"http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=0&Value0=1.5&Value1=7\"");
+    //system("wget -O httpresult.txt \"http://a2onlinedatabase.office.a2.kph/intern/sc/insert.php?InsertNew=-1&NodeID=0&Value0=1.5&Value1=7\"");
 }
