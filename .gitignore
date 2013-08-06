@@ -9,3 +9,7 @@
 
 # QtCreator stuff
 CMakeLists.txt.user
+
+# no backup/autosave files
+*~
+\#*\#
