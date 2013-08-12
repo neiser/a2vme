@@ -57,7 +57,7 @@
     #include <time.h>
 #endif  /* DEBUG_MODE */
 
-#include "micro.h"
+#include "playxsvf.h"
 #include "lenval.h"
 #include "ports.h"
 
@@ -1771,7 +1771,7 @@ int main( int iArgc, char** ppzArgv )
 
     for ( i = 1; i < iArgc ; ++i )
     {
-        if ( !_stricmp( ppzArgv[ i ], "-v" ) )
+	    if ( !strcasecmp( ppzArgv[ i ], "-v" ) )
         {
             ++i;
             if ( i >= iArgc )
