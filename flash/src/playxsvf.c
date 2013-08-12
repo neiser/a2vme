@@ -1767,7 +1767,7 @@ int main( int iArgc, char** ppzArgv )
     iErrorCode          = XSVF_ERRORCODE( XSVF_ERROR_NONE );
     pzXsvfFileName      = 0;
 
-    printf( "XSVF Player v%s, Xilinx, Inc.\n", XSVF_VERSION );
+    printf( "XSVF Player v%s, Xilinx, Inc. (modified by A2)\n", XSVF_VERSION );
 
     for ( i = 1; i < iArgc ; ++i )
     {

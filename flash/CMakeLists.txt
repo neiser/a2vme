@@ -1,4 +1,4 @@
-include_directories(src)
+include_directories(src ${CMAKE_SOURCE_DIR}/vmebus/src)
 
 # very simple executables for VUPROM flashing
 # they differ by some preprocessor variable RANGE_NUMBER
@@ -15,7 +15,7 @@ add_executable(vuprom4 src/vuprom.c)
 SET_TARGET_PROPERTIES(vuprom4 PROPERTIES COMPILE_DEFINITIONS "RANGENUMBER=6")
 
 # compile xsvf flasher, enable int main() via compile definition
-add_executable(playxsvf src/playxsvf.c src/lenval.c src/ports.c)
+add_executable(playxsvf src/playxsvf.c src/lenval.c src/ports.c ${CMAKE_SOURCE_DIR}/vmebus/src/vmebus.c)
 SET_TARGET_PROPERTIES(playxsvf PROPERTIES COMPILE_DEFINITIONS "XSVF_MAIN")
 
 # install the scripts
