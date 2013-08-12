@@ -51,7 +51,7 @@ int main(int argc, char *argv[])
            addr, pattern, rw);
     while(1)  {
       *poi = pattern;
-      usleep(1000);
+      //usleep(1000);
     }
   }
 
