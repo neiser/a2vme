@@ -14,6 +14,8 @@
 #define TMS (short) 1
 #define TDI (short) 2
 
+extern void setVitecAddress(unsigned short val);
+
 /* set the port "p" (TCK, TMS, or TDI) to val (0 or 1) */
 extern void setPort(short p, short val);
 

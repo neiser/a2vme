@@ -18,7 +18,12 @@ static int  g_iTCK = 0; /* For xapp058_example .exe */
 static int  g_iTMS = 0; /* For xapp058_example .exe */
 static int  g_iTDI = 0; /* For xapp058_example .exe */
 static volatile unsigned short *poi = NULL;
+static unsigned short vitec_address = 0;
 
+void setVitecAddress(unsigned short val)
+{
+    vitec_address = val;    
+}
 
 /* setPort:  Implement to set the named JTAG signal (p) to the new value (v).*/
 /* if in debugging mode, then just set the variables */
@@ -36,7 +41,7 @@ void setPort(short p,short val)
     // initialize VME bus if not done yet
     if(poi==NULL) {
         // VITEC at address 0x0, use port mode (bit 11 is high)
-        unsigned long addr = 0x0800;
+        unsigned long addr = 0x0800 | vitec_address << 12;
         // align the address to the PAGE_SIZE = 0x1000
         // then try to open it
         unsigned long remainder = addr % 0x1000;

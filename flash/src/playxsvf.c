@@ -1761,13 +1761,14 @@ int main( int iArgc, char** ppzArgv )
     int     iErrorCode;
     char*   pzXsvfFileName;
     int     i;
+    unsigned short vitec_address = 0;
     clock_t startClock;
     clock_t endClock;
 
     iErrorCode          = XSVF_ERRORCODE( XSVF_ERROR_NONE );
     pzXsvfFileName      = 0;
 
-    printf( "XSVF Player v%s, Xilinx, Inc. (modified by A2)\n", XSVF_VERSION );
+    printf( "XSVF Player v%s, Xilinx, Inc. (modified for VITEC cards)\n", XSVF_VERSION );
 
     for ( i = 1; i < iArgc ; ++i )
     {
@@ -1777,12 +1778,32 @@ int main( int iArgc, char** ppzArgv )
             if ( i >= iArgc )
             {
                 printf( "ERROR:  missing <level> parameter for -v option.\n" );
+                exit(-1);
             }
             else
             {
                 xsvf_iDebugLevel    = atoi( ppzArgv[ i ] );
                 printf( "Verbose level = %d\n", xsvf_iDebugLevel );
             }
+        }
+        else if ( !strcasecmp( ppzArgv[ i ], "-a" ) )
+        {
+            ++i;
+            if ( i >= iArgc )
+            {
+                printf( "ERROR:  missing <address> parameter for -a option.\n" );
+                exit(-1);
+            }
+            else
+            {
+                sscanf(ppzArgv[i], "%x\n", &vitec_address);
+                if(vitec_address>0xf) {
+                    printf( "ERROR:  <address> larger than 0xF\n" );
+                    exit(-1);
+                }
+                printf( "VITEC address = 0x%lx\n", vitec_address);
+            }
+            
         }
         else
         {
@@ -1793,8 +1814,9 @@ int main( int iArgc, char** ppzArgv )
 
     if ( !pzXsvfFileName )
     {
-        printf( "USAGE:  playxsvf [-v level] filename.xsvf\n" );
+        printf( "Usage:  playxsvf [-v level] [-a address] filename.xsvf\n" );
         printf( "where:  -v level      = verbose, level = 0-4 (default=0)\n" );
+        printf( "        -a address    = VITEC VME address, in hex (default=0x0)\n" );        
         printf( "        filename.xsvf = the XSVF file to execute.\n" );
     }
     else
@@ -1808,6 +1830,9 @@ int main( int iArgc, char** ppzArgv )
         }
         else
         {
+            /* Tell the VME access code the desired VITEC address */
+            setVitecAddress(vitec_address);
+            
             /* Initialize the I/O.  SetPort initializes I/O on first call */
             setPort( TMS, 1 );
 
