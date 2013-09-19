@@ -2,69 +2,9 @@
 #include <stdio.h>
 #include <fcntl.h>
 #include "vmebus.h"
+#include <time.h>       /* clock_t, clock, CLOCKS_PER_SEC */
 
-#define Verbose 0 //Set to 1 for detailed read/write information, if not to 0
-
-volatile unsigned long *AllocateVMEAccess(unsigned long Myaddr) {
-	unsigned long Myrest, MyOrigAddr, Mypattern;
-	volatile unsigned long *Mypoi;
-	MyOrigAddr = Myaddr;
-	Myaddr &= 0x1fffffff;	// obere Bits ausmaskieren
-	Myrest = Myaddr % 0x1000;
-	Myaddr = (Myaddr / 0x1000) * 0x1000;
-
-	if ((Mypoi = vmeext(Myaddr, 0x1000)) == NULL) {
-		perror("Error opening device.\n");
-		exit (-1);
-	}
-	Mypoi += (Myrest / 4);  //da 32Bit-Zugriff
-
-	//Lesen
-	//Mypattern = *Mypoi; //Doppelt lesen
-
-	return Mypoi;
-}
-
-unsigned long VMEWrite(unsigned long Myaddr, unsigned long Mypattern) {
-	unsigned long MyOrigAddr, Myrest;
-	volatile unsigned long *Mypoi;
-	volatile unsigned long MyTempPattern;
-	MyOrigAddr = Myaddr;
-	Myaddr &= 0x1fffffff;	// obere Bits ausmaskieren
-	Myrest = Myaddr % 0x1000;
-	Myaddr = (Myaddr / 0x1000) * 0x1000;
-
-	if ((Mypoi = vmeext(Myaddr, 0x1000)) == NULL) {
-		perror("Error opening device.\n");
-		exit (-1);
-	}
-	Mypoi += (Myrest / 4);  //da 32Bit-Zugriff
-
-//	MyTempPattern = *Mypoi;  //Erst mal die Adresse auf dem VMEbus setzen durch Lesen, um einen Fehler im VUPROM module auszugleichen
-	*Mypoi = Mypattern;  //Doppelter Zugriff beim Schreiben
-
-	if (Verbose) {
-		printf("Write address = %0.8lx Pattern = %0.8lx\n", MyOrigAddr, Mypattern);
-	}
-
-	munmap((unsigned long *) Mypoi, 0x1000);
-	return 0;
-}
-
-unsigned long SetTopBits(unsigned long Myaddr) {
-	volatile unsigned long *Mypoi;
-
-	// obere 3 Bits setzen via Register 0xaa000000
-	if ((Mypoi = vmebus(0xaa000000, 0x1000)) == NULL) {
-		perror("Error opening device.\n");
-		exit (-1);
-	}
-	*Mypoi = Myaddr & 0xe0000000;
-	// obere 3 Bits setzen: fertig
-
-	munmap((unsigned long *) Mypoi, 0x1000);
-	return 0;
-}
+#define Verbose 1 //Set to 1 for detailed read/write information, if not to 0
 
 int main(argc, argv)
 	int argc; char *argv[];
@@ -83,34 +23,61 @@ int main(argc, argv)
 	}
 
 
-	OpenVMEbus();
+	//open VITEC
+	volatile unsigned short *poi = vmesio(0x0, 0x1000);
+	if (poi == NULL) {
+		perror("Error opening device. Are you root? Msg");
+		exit (-1);
+	}
 
-	SetTopBits(BaseAddr);
+	printf("VITEC Firmware: %x\n", *(poi+0xe/2));
 
-	if (Verbose) {printf("Start: \n");}
-
-	volatile unsigned long *Mypoi;
-	Mypoi = AllocateVMEAccess(BaseAddr+0x2000);
 
 	int Counter = 0;
 	int Counter2 = 0;
+	int CounterRec = 0;
+	int CounterEventBefore = -1;
+	int NumberOfErrors = 0;
+	clock_t before = clock();
+	clock_t result;
+	*(poi+0x6/2) = 0; //Set ACK low
 	while (-1) {
 		Counter2++;
-		if (*(Mypoi+0x460/4) != 0) {
+
+		int EventInt = 0;
+		EventInt = (*(poi+0xc/2) & 0x8000); //Wait For INT bit to become high
+//		EventInt = (*(poi+0xc/2) & 0x10);   //Wait for Serial ID received, bit4 should become high
+
+
+		if ( EventInt ) { //Wait for Int
 			Counter++;
-	//		printf("%x\n",*(Mypoi+0x2a0/4));
-			if ((Counter % 10000) == 0) {
-				printf("%i\t%i\t%f\n",Counter,Counter2,Counter*1.0/Counter2);
-			}
-			if ((Counter % 10000) == 0) {
-				*(Mypoi+0x470/4) = 2; //Stop
-				printf("TCS reset...");
-				//sleep(1);
-				printf(" done.\n");
-				*(Mypoi+0x470/4) = 1; //Start
+			*(poi+0x6/2) = 1; //Set VITEC ACK high
+			int WaitCnt = 0;
+			while ( (*(poi+0xc/2) & 0x10) == 0) { WaitCnt++;  } //Wait for Serial ID received, bit4 should become high
+			//if (WaitCnt > 10) printf("%d ", WaitCnt);
+			
+			unsigned short LastReg = *(poi+0xc/2);
+			if ( (LastReg & 0xFF) != 0x1a) {
+				printf("Wrong Status Register: %x\n", LastReg);
 			}
 
-			*(Mypoi+0x450/4) = 1; //CPU ACK
+			CounterRec = (*(poi+0xa/2) << 16);
+			CounterRec += (*(poi+0x8/2));
+
+			if ( (CounterRec-CounterEventBefore) != 1) {
+				printf("Error in EventID receiving. Current event: %8x  event before: %8x\n", CounterRec, CounterEventBefore);
+				NumberOfErrors++;
+			}
+			CounterEventBefore = CounterRec;
+			
+			//printf("%8d: %0.4x %0.8x\n", Counter, *(poi+0xc/2), CounterRec);
+			*(poi+0x6/2) = 0; //Set ACK low
+			if ((Counter % 1000) == 0) {
+				result = clock() - before;
+				printf("%d\t%i\t%i\t",NumberOfErrors, Counter,Counter2);
+				printf("%f\n",1000/(((float)result)/CLOCKS_PER_SEC));
+				before = clock();
+			}
 		}
 	}
 	
