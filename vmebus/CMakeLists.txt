@@ -13,6 +13,6 @@ add_executable(vmesio    src/vmesio.c ${DEPS})
 file(GLOB SCRIPTS "scripts/*")
 foreach(f ${SCRIPTS})
   get_filename_component(f_name ${f} NAME)
-  configure_file(${f} "${EXECUTABLE_OUTPUT_PATH}/${f_name}" COPY_ONLY)
+  add_custom_target(link_${f_name} ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink "${f}" "${EXECUTABLE_OUTPUT_PATH}/${f_name}")
 endforeach()
-

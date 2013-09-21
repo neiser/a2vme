@@ -19,10 +19,9 @@ add_executable(playxsvf src/playxsvf.c src/lenval.c src/ports.c ${CMAKE_SOURCE_D
 SET_TARGET_PROPERTIES(playxsvf PROPERTIES COMPILE_DEFINITIONS "XSVF_MAIN")
 
 # install the scripts
-
 file(GLOB SCRIPTS "scripts/*")
 foreach(f ${SCRIPTS})
   get_filename_component(f_name ${f} NAME)
-  configure_file(${f} "${EXECUTABLE_OUTPUT_PATH}/${f_name}" COPY_ONLY)
+  add_custom_target(link_${f_name} ALL
+    COMMAND ${CMAKE_COMMAND} -E create_symlink "${f}" "${EXECUTABLE_OUTPUT_PATH}/${f_name}")
 endforeach()
-
