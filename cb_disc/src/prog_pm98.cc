@@ -33,13 +33,11 @@ int main(int argc, char *argv[]){
   int bReadOnly = 0;
   char szLine[256];
   char szFile[256];
-  char szLog[256];
-  
+
   TVME vme(0xf800, 0x1000,  VME_A16_U);
   Tpm98 disc(vme.GetVirtBase(), 0, 0);
-  
+
   FILE* fpSetup;
-  FILE* fpLog;
 
   if (argc<2)
     sprintf(szFile, "pm98.set");
@@ -56,38 +54,30 @@ int main(int argc, char *argv[]){
 	  bReadOnly = 0;
 	}
     }
-  
-  if (argc<3)
-    sprintf(szLog, "pm98.log");
+
+  if(bReadOnly)
+    cout << endl << "# Reading Discriminators specified in file " << szFile << endl;
   else
-    sprintf(szLog, "%s", argv[2]);
-  
-  if(bReadOnly) 
-    cout << endl << "Reading Discriminators specified in file " << szFile;
-  else
-    cout << endl << "Programming from file " << szFile;
-  cout << ", logging to file " << szLog << "...\n" << endl;
+    cout << endl << "# Programming from file " << szFile << endl;
 
   (void)time(&the_time);
   fpSetup = fopen(szFile, "r");
   if(fpSetup == NULL) {
-    cout << "Could not open " << szFile << ", exiting." << endl;
+    cout << "# Could not open " << szFile << ", exiting." << endl;
     exit(1);
   }
-  fpLog = fopen(szLog, "a");
-  printf("  Device\t  Thr (low)\t Thr (high)\t    Mask\n");
-  printf("  Br  Dev\t set  read\t set  read \t  set     read\n");
-  fprintf(fpLog,"#\n# Setting/checking discriminators @ %s", 
+  printf("# Device\t  Thr (low)\t Thr (high)\t    Mask\n");
+  printf("# Br  Dev\t set  read\t set  read \t  set     read\n");
+  printf("# Setting/checking discriminators @ %s", 
 	  ctime(&the_time));
   if(bReadOnly) 
-    fprintf(fpLog, "# comparing current settings with file: %s\n#\n", szFile);
+    printf("# comparing current settings with file: %s\n#\n", szFile);
   else
-    fprintf(fpLog, "# setting up discriminators according to file: %s#\n\n",
+    printf("# setting up discriminators according to file: %s#\n\n",
 	    szFile);
-  fprintf(fpLog, "TimeStamp: %lu\n", (unsigned long)the_time);
-  fprintf(fpLog, "# Device\t  Thr (low)\t Thr (high)\t    Mask\n");
-  fprintf(fpLog, "# Br  Dev\t set  read\t set  read \t  set     read\n");
-  fflush(fpLog);
+  printf("TimeStamp: %lu\n", (unsigned long)the_time);
+  printf("# Device\t  Thr (low)\t Thr (high)\t    Mask\n");
+  printf("# Br  Dev\t set  read\t set  read \t  set     read\n");
   while (!feof(fpSetup)){
     dwLine++;
     fgets(szLine, sizeof(szLine), fpSetup);
@@ -99,7 +89,6 @@ int main(int argc, char *argv[]){
 	cout << endl << "Wrong parameter count in line " 
 	     << dwLine << ". Exiting." << endl;
 	fclose(fpSetup);
-	fclose(fpLog);
 	return -1;
       }
 	  
@@ -120,17 +109,9 @@ int main(int argc, char *argv[]){
       printf("  %2d %3d\t %3d  %3d \t %3d  %3d  \t 0x%-4x  0x%-4x\n",
 	     wBranch, wDevice, wThresLo, wValueLo, wThresHi, wValueHi, 
 	     wMask, wValueMask);
-
-      fprintf(fpLog, "  %2d %3d\t %3d  %3d \t %3d  %3d  \t 0x%-4x  0x%-4x\n",
-	      wBranch, wDevice, wThresLo, wValueLo, wThresHi, wValueHi, 
-	      wMask, wValueMask);  
     }
   }
-  
   fclose(fpSetup);
-  fclose(fpLog);
-  cout << endl << "Programming from file " << szFile;
-  cout << ", logging to file " << szLog << " done." << endl;
-  
+  cout << endl << "Programming from file " << szFile << " completed" << endl;
   return 0;
 }
