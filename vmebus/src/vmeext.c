@@ -12,13 +12,18 @@ int main(int argc, char *argv[])
   char* rw;
   volatile unsigned long *poi;
 
-  if (argc != 4) {
-    printf("Aufruf = vmeext  Addr. (Hex) Pattern (Hex) r, w, rl oder wl\n");
+  if ( (argc != 4) && (argc != 5) ) {
+    printf("Call this program = vmeext  Addr. (Hex) Pattern (Hex) [r, w, rl or wl]\n");
+    printf("                 or vmeext  Addr. (Hex) D [r, w, rl or wl] Pattern (dec)\n");
     exit(1);
   }
 
   sscanf(argv[1], "%x\n", &addr);
-  sscanf(argv[2], "%x\n", &pattern);
+  if (argc == 4) {
+    sscanf(argv[2], "%x\n", &pattern);
+  } else {
+    sscanf(argv[4], "%d\n", &pattern);
+  }
   rw = argv[3];
 
   // obere 3 Bits setzen via Register 0xaa000000
