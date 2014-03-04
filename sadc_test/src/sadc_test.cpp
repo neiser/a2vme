@@ -24,9 +24,10 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
   // BUT IS IT COMPLETE?!
   // since every read takes 1us, 
   // this is a timeout of 200us
-  int status_tries = 0;
+  UInt_t status_tries = 0;
   UInt_t status1 = 0;
   while(true) {
+    status_tries++;
     // do the actual read
     status1 = *(gesica+0x24/4);
     // check lowest bit
@@ -38,8 +39,7 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
       // reset module! can this harm?
       *(gesica+0x0/4) = 1;
       return;
-    }
-    status_tries++;            
+    }                
   }
   
   // read first header from 0x28
@@ -77,10 +77,27 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
     cerr << "nWords in status " << nWordStatus 
          << " does not match "
          << "nWords in header " << nWordHeader << endl;
-    // currently, this is simply ignored
-    // so no reset and no return
-    // *(gesica+0x0/4) = 1;
-    // return;
+    UInt_t words_tries = 0;
+    UInt_t nWordStatus_again;
+    while(true) {
+      words_tries++;            
+      UInt_t status_again = *(gesica+0x24/4);
+      nWordStatus_again = (status_again >> 16) & 0xfff;
+      
+      // check words again
+      if(nWordStatus_again == nWordHeader) 
+	break;
+      if(words_tries==200) {
+	cerr << "Reached " << status_tries 
+	     << " tries matching nWords...grml. RESET!" << endl;
+	*(gesica+0x0/4) = 1;
+	return;
+      }     
+    }
+    cerr << "After reading " << words_tries << " times, "
+	 << "we got matching nWords!" << endl;
+    // just for consistency, set it
+    nWordStatus = nWordStatus_again;
   }
   if(nWordHeader > 0x1000) {
     cerr << "nWords in header too large " << nWordHeader 
