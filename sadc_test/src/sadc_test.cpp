@@ -187,8 +187,12 @@ int main(int argc, char *argv[])
     cout << "Received Event, ID=" << EventID << endl;
     cout << "Dumping spybuffer: " << endl;
     for(size_t n=0;n<spybuffer.size();n++) {
-      cout << setfill('0') << setw(8) << hex 
-           << n << " " << spybuffer[n] << endl;
+      cout << hex 
+	   << setfill('0') << setw(8)  
+           << n << " " 
+	   << setfill('0') << setw(8)
+	   << spybuffer[n] 
+	   << dec << endl;
     }
     cout << "=======================================" << endl;
     
