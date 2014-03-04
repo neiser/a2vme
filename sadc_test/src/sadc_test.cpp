@@ -1,37 +1,42 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <stdbool.h>
-#include <fcntl.h>
+#include <iostream>
+#include <cstdlib>
+
+extern "C" {
 #include "vmebus.h"
+}
 
-
+using namespace std;
 
 int main(int argc, char *argv[])
 {
     if (argc != 1) {
-        fprintf(stderr, "This program does not take arguments.\n");
+        cerr << "This program does not take arguments." << endl;
         exit(EXIT_FAILURE);
     }
 
     // open VME access to VITEC at base address 0x0, size 0x1000
     // Short I/O = 16bit addresses, 16bit data
-    volatile unsigned short *vitec = vmesio(0x0, 0x1000);
+    typedef volatile unsigned short* vme16_t;
+    vme16_t vitec = (vme16_t)vmesio(0x0, 0x1000);
     if (vitec == NULL) {
-        fprintf(stderr, "Error opening VME access to VITEC.\n");
+        cerr << "Error opening VME access to VITEC." << endl;
         exit (EXIT_FAILURE);
     }
     // the firmware ID is at 0xe
-    printf("VITEC Firmware (should be 0xaa02): 0x%04x\n", *(vitec+0xe/2));
+    cout << "VITEC Firmware (should be 0xaa02): 0x"
+         << hex << *(vitec+0xe/2) << endl;
 
     // open VME access to GeSiCa at 
     // base adress 0xdd1000 (vme-cb-adc-1a), size 0x1000
-    volatile unsigned long *gesica = vmestd(0xdd1000, 0x1000);
+    typedef volatile unsigned long* vme32_t;    
+    vme32_t gesica = (vme32_t)vmestd(0xdd1000, 0x1000);
     if (gesica == NULL) {
-        fprintf(stderr, "Error opening VME access to GeSiCa.\n");
+        cerr << "Error opening VME access to GeSiCa." << endl;
         exit (EXIT_FAILURE);
     }
     // the module ID is at 0x0
-    printf("GeSiCa Firmware (should be 0x440d5918): 0x%08x\n", *(gesica+0x0/4));
+    cout << "GeSiCa Firmware (should be 0x440d5918): 0x"
+         << hex << *(gesica+0x0/4) << endl;
     
     // Set ACK of VITEC low by default
     *(vitec+0x6/2) = 0;
