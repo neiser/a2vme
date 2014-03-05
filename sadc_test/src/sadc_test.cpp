@@ -134,6 +134,8 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
     // this is probably not a serious error...
     // so continue and no reset
     r.ErrorCode |= 1 << 9;
+    *(gesica+0x0/4) = 1;
+    return;
   }
   
   // remember the TCS event ID for debugging...
@@ -142,6 +144,21 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   // check the status reg again
   UInt_t status3 = *(gesica+0x24/4);
   if(status3 != 0x0) {
+    // drain the spybuffer, 
+    // don't know if this is really meaningful
+    // at this point...
+    UInt_t n = 0;
+    do {
+      UInt_t datum = *(gesica+0x28/4);
+      spybuffer.push_back(datum);
+      n++;
+      if(n == 0x1000) {
+        r.ErrorCode |= 10;
+        *(gesica+0x0/4) = 1;
+        return;
+      }
+    }
+    while(*(gesica+0x24/4) != 0x0);
     r.ErrorCode |= 1 << 6;
     *(gesica+0x0/4) = 1;
     return;
