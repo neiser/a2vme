@@ -18,7 +18,7 @@ struct gesica_result_t {
   UInt_t nWordHeader;
   UInt_t nStatusTries;
   UInt_t nWordTries;
-  UInt_t nTrailerPos;
+  UInt_t nFifoReads;
   UInt_t ErrorCode;
   UInt_t EventIDTCS;
 };
@@ -79,7 +79,9 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   // expect less than 4096=0xfff words
   r.nWordStatus = (status2 >> 16) & 0xfff;
   if(r.nWordHeader != r.nWordStatus) {
-    // this is the famous "Error 4" appearing very often...
+    // this is the famous "Error 4" appearing very often,
+    // but actually this is not an error but can usually 
+    // be cured if the status reg is read again...
     r.ErrorCode |= 1 << 4;
     UInt_t nWordStatus_again;
     while(true) {
@@ -96,9 +98,12 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
         return;
       }     
     }
-    // just for consistency, set it
-    r.nWordStatus = nWordStatus_again;
+    // we dont set r.nWordStatus again
+    // since we want to keep this for debugging
+    // in the following, only r.nWordHeader is used!
+    
   }
+  
   if(r.nWordHeader > 0x1000) {
     r.ErrorCode |= 1 << 2;
     *(gesica+0x0/4) = 1;
@@ -106,21 +111,32 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   }
   
   // read the FIFO, store it in spybuffer
-  // note that this can be wrong if 
-  // nWordHeader and nWordStatus don't match, see above...
+  // do this until we see the trailer
   vector<UInt_t> spybuffer;
-  for( UInt_t n=0; n<r.nWordHeader; n++ ) { 
+  while(true) {
+    r.nFifoReads++;
     UInt_t datum = *(gesica+0x28/4);
     spybuffer.push_back(datum);
+    // check for the trailer 
+    if(datum == 0xcfed1200) {
+      break;
+    }
+    else if(r.nFifoReads>0x1000) {
+      // this should never happen,
+      // and it's a serious error
+      r.ErrorCode |= 1 << 8;
+      *(gesica+0x0/4) = 1;
+      return;
+    }
+  }
+    
+  if(r.nFifoReads != r.nWordHeader) {
+    // this is probably not a serious error...
+    // so continue and no reset
+    r.ErrorCode |= 1 << 9;
   }
   
-  // check the trailer 
-  if(spybuffer[r.nWordHeader-1] != 0xcfed1200) {
-    r.ErrorCode |= 1 << 3;
-    *(gesica+0x0/4) = 1;
-    return;
-  }
-  r.nTrailerPos = r.nWordHeader;
+  // remember the TCS event ID for debugging...
   r.EventIDTCS = spybuffer[0];
   
   // check the status reg again
@@ -130,10 +146,6 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
     *(gesica+0x0/4) = 1;
     return;
   }
-  
-  // always do a reset at the moment, 
-  // this is due to "Error 4", see above...
-  *(gesica+0x0/4) = 1;
 }
 
 int main(int argc, char *argv[])
@@ -203,7 +215,7 @@ int main(int argc, char *argv[])
          << r.nWordHeader << " "
          << r.nStatusTries << " "
          << r.nWordTries << " "
-         << r.nTrailerPos << " "
+         << r.nFifoReads << " "
          << r.ErrorCode << endl;
     
     // Set ACK of VITEC low,
