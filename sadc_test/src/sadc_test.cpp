@@ -84,23 +84,6 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
     // this is the famous "Error 4" appearing very often...
     r.ErrorCode |= 1 << 4;
     r.nWordTries = 0;
-    UInt_t nWordStatus_again;
-    while(true) {
-      r.nWordTries++;            
-      UInt_t status_again = *(gesica+0x24/4);
-      nWordStatus_again = (status_again >> 16) & 0xfff;
-      
-      // check words again
-      if(nWordStatus_again == r.nWordHeader) 
-        break;
-      if(r.nWordTries==200) {
-        r.ErrorCode |= 1 << 7;
-        *(gesica+0x0/4) = 1;
-        return;
-      }     
-    }
-    // just for consistency, set it
-    r.nWordStatus = nWordStatus_again;
   }
   if(r.nWordHeader > 0x1000) {
     r.ErrorCode |= 1 << 2;
