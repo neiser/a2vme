@@ -20,6 +20,8 @@ struct gesica_result_t {
   UInt_t nWordTries;
   UInt_t nTrailerPos;
   UInt_t ErrorCode;
+  UInt_t EventIDSource;
+  UInt_t EventIDTCS;
 };
 
 // returns the 32bit words in the spybuffer, 
@@ -27,15 +29,12 @@ struct gesica_result_t {
 void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   // this is motivated by the SpyRead() method in TVME_GeSiCA.h
   
-  r.ErrorCode = 0;
-  
   // read status register,
   // wait until lowest bit is high
   // indicates that data buffer is not empty
   // BUT IS IT COMPLETE?!
   // since every read takes 1us, 
   // this is a timeout of 200us
-  r.nStatusTries = 0;
   UInt_t status1 = 0;
   while(true) {
     r.nStatusTries++;
@@ -51,6 +50,13 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
       return;
     }                
   }
+  
+  // read some event IDs
+  // source at 0x34
+  r.EventIDSource = *(gesica+0x34/4);
+  // TCS at 0x38
+  r.EventIDTCS = *(gesica+0x38/4);
+  
   
   // read first header from 0x28
   UInt_t header1 = *(gesica+0x28/4);
@@ -80,7 +86,6 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   // but it should not harm, since we always 
   // expect less than 4096=0xfff words
   r.nWordStatus = (status2 >> 16) & 0xfff;
-  r.nWordTries = 0;
   if(r.nWordHeader != r.nWordStatus) {
     // this is the famous "Error 4" appearing very often...
     r.ErrorCode |= 1 << 4;
@@ -155,7 +160,7 @@ int main(int argc, char *argv[])
   *(vitec+0x6/2) = 0;
   
   cout << "# Waiting for triggers..." << endl;
-  cout << "# EventID nWordStatus nWordHeader nStatusTries nWordTries nTrailerPos ErrorCode" << endl;
+  cout << "# EventID EventIDSource EventIDTCS nWordStatus nWordHeader nStatusTries nWordTries nTrailerPos ErrorCode" << endl;
   
   while(true) {
     // Wait for INT bit of VITEC to become high
@@ -171,7 +176,7 @@ int main(int argc, char *argv[])
     
     
     // ******* START GESICA READOUT
-    gesica_result_t r;
+    gesica_result_t r = {};
     readout_gesica(gesica, r);
     // ******* END GESICA READOUT
     
@@ -183,6 +188,8 @@ int main(int argc, char *argv[])
     EventID += *(vitec+0x8/2);
     
     cout << EventID << " "
+         << r.EventIDSource << " "
+         << r.EventIDTCS << " "
          << r.nWordStatus << " "
          << r.nWordHeader << " "
          << r.nStatusTries << " "
