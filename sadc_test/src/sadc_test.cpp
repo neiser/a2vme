@@ -86,16 +86,16 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
       
       // check words again
       if(nWordStatus_again == nWordHeader) 
-	break;
+        break;
       if(words_tries==200) {
-	cerr << "Reached " << status_tries 
-	     << " tries matching nWords...grml. RESET!" << endl;
-	*(gesica+0x0/4) = 1;
-	return;
+        cerr << "Reached " << status_tries 
+             << " tries matching nWords...grml. RESET!" << endl;
+        *(gesica+0x0/4) = 1;
+        return;
       }     
     }
     cerr << "After reading " << words_tries << " times, "
-	 << "we got matching nWords!" << endl;
+         << "we got matching nWords!" << endl;
     // just for consistency, set it
     nWordStatus = nWordStatus_again;
   }
@@ -205,11 +205,11 @@ int main(int argc, char *argv[])
     cout << "Dumping spybuffer: " << endl;
     for(size_t n=0;n<spybuffer.size();n++) {
       cout << hex 
-	   << setfill('0') << setw(8)  
+           << setfill('0') << setw(8)  
            << n << " " 
-	   << setfill('0') << setw(8)
-	   << spybuffer[n] 
-	   << dec << endl;
+           << setfill('0') << setw(8)
+           << spybuffer[n] 
+           << dec << endl;
     }
     cout << "=======================================" << endl;
     
