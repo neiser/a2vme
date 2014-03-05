@@ -80,10 +80,10 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   // but it should not harm, since we always 
   // expect less than 4096=0xfff words
   r.nWordStatus = (status2 >> 16) & 0xfff;
+  r.nWordTries = 0;
   if(r.nWordHeader != r.nWordStatus) {
     // this is the famous "Error 4" appearing very often...
     r.ErrorCode |= 1 << 4;
-    r.nWordTries = 0;
   }
   if(r.nWordHeader > 0x1000) {
     r.ErrorCode |= 1 << 2;
