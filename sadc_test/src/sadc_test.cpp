@@ -13,10 +13,21 @@ typedef volatile unsigned short* vme16_t;
 
 using namespace std;
 
+struct gesica_result_t {
+  UInt_t nWordStatus;
+  UInt_t nWordHeader;
+  UInt_t nStatusTries;
+  UInt_t nWordTries;
+  UInt_t nTrailerPos;
+  UInt_t ErrorCode;
+};
+
 // returns the 32bit words in the spybuffer, 
 // if some could be read...
-void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
+void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   // this is motivated by the SpyRead() method in TVME_GeSiCA.h
+  
+  r.ErrorCode = 0;
   
   // read status register,
   // wait until lowest bit is high
@@ -24,18 +35,17 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
   // BUT IS IT COMPLETE?!
   // since every read takes 1us, 
   // this is a timeout of 200us
-  UInt_t status_tries = 0;
+  r.nStatusTries = 0;
   UInt_t status1 = 0;
   while(true) {
-    status_tries++;
+    r.nStatusTries++;
     // do the actual read
     status1 = *(gesica+0x24/4);
     // check lowest bit
     if(status1 & 0x1) 
       break;
-    if(status_tries==200) {
-      cerr << "Reached " << status_tries 
-           << " tries waiting for data, RESET!" << endl;
+    if(r.nStatusTries==200) {
+      r.ErrorCode |= 1 << 5;
       // reset module! can this harm?
       *(gesica+0x0/4) = 1;
       return;
@@ -46,8 +56,7 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
   UInt_t header1 = *(gesica+0x28/4);
   // ...should be zero!
   if(header1 != 0x0) {
-    cerr << "First word 0x" << hex << header1 << dec
-         << " was not zero, RESET!" << endl;
+    r.ErrorCode |= 1 << 1;
     // reset module! can this harm?
     *(gesica+0x0/4) = 1;
     return;
@@ -57,51 +66,44 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
   UInt_t header2 = *(gesica+0x28/4);
   // check error flag
   if(header2 & 0x80000000) {
-    cerr << "Catch Error bit is set: 0x" << hex << header2 << dec
-         << ", RESET!" << endl;
+    r.ErrorCode |= 1 << 0;
     // reset module! can this harm?
     *(gesica+0x0/4) = 1;
     return;
   }
   
   // extract number of words from header
-  UInt_t nWordHeader = header2 & 0xffff;
+  r.nWordHeader = header2 & 0xffff;
   // read status reg 0x24 again (should be the same as in status1)
   UInt_t status2 = *(gesica+0x24/4);
   // the next mask 0xfff is actually wrong, 
   // but it should not harm, since we always 
   // expect less than 4096=0xfff words
-  UInt_t nWordStatus = (status2 >> 16) & 0xfff;
-  if(nWordHeader != nWordStatus) {
+  r.nWordStatus = (status2 >> 16) & 0xfff;
+  if(r.nWordHeader != r.nWordStatus) {
     // this is the famous "Error 4" appearing very often...
-    cerr << "nWords in status " << nWordStatus 
-         << " does not match "
-         << "nWords in header " << nWordHeader << endl;
-    UInt_t words_tries = 0;
+    r.ErrorCode |= 1 << 4;
+    r.nWordTries = 0;
     UInt_t nWordStatus_again;
     while(true) {
-      words_tries++;            
+      r.nWordTries++;            
       UInt_t status_again = *(gesica+0x24/4);
       nWordStatus_again = (status_again >> 16) & 0xfff;
       
       // check words again
-      if(nWordStatus_again == nWordHeader) 
+      if(nWordStatus_again == r.nWordHeader) 
         break;
-      if(words_tries==200) {
-        cerr << "Reached " << status_tries 
-             << " tries matching nWords...grml. RESET!" << endl;
+      if(r.nWordTries==200) {
+        r.ErrorCode |= 1 << 7;
         *(gesica+0x0/4) = 1;
         return;
       }     
     }
-    cerr << "After reading " << words_tries << " times, "
-         << "we got matching nWords!" << endl;
     // just for consistency, set it
-    nWordStatus = nWordStatus_again;
+    r.nWordStatus = nWordStatus_again;
   }
-  if(nWordHeader > 0x1000) {
-    cerr << "nWords in header too large " << nWordHeader 
-         << ", RESET!" << endl;
+  if(r.nWordHeader > 0x1000) {
+    r.ErrorCode |= 1 << 2;
     *(gesica+0x0/4) = 1;
     return;
   }
@@ -109,25 +111,24 @@ void readout_gesica(vme32_t gesica, vector<UInt_t>& spybuffer) {
   // read the FIFO, store it in spybuffer
   // note that this can be wrong if 
   // nWordHeader and nWordStatus don't match, see above...
-  for( UInt_t n=0; n<nWordHeader; n++ ) { 
+  vector<UInt_t> spybuffer;
+  for( UInt_t n=0; n<r.nWordHeader; n++ ) { 
     UInt_t datum = *(gesica+0x28/4);
     spybuffer.push_back(datum);
   }
   
   // check the trailer 
-  if(spybuffer[nWordHeader-1] != 0xcfed1200) {
-    cerr << "Last word in spybuffer does not match 0xcfed1200 != 0x" 
-         << hex << spybuffer[nWordHeader-1] << dec 
-         << ", RESET!" << endl;
+  if(spybuffer[r.nWordHeader-1] != 0xcfed1200) {
+    r.ErrorCode |= 1 << 3;
     *(gesica+0x0/4) = 1;
     return;
   }
+  r.nTrailerPos = r.nWordHeader;
   
   // check the status reg again
   UInt_t status3 = *(gesica+0x24/4);
   if(status3 != 0x0) {
-    cerr << "Status reg 0x" << hex << status3 << dec
-         << " did not become zero, RESET!" << endl;
+    r.ErrorCode |= 1 << 6;
     *(gesica+0x0/4) = 1;
     return;
   }
@@ -186,8 +187,8 @@ int main(int argc, char *argv[])
     
     
     // ******* START GESICA READOUT
-    vector<UInt_t> spybuffer;
-    readout_gesica(gesica, spybuffer);
+    gesica_result_t r;
+    readout_gesica(gesica, r);
     // ******* END GESICA READOUT
     
     // Wait for Serial ID received, bit4 should become high
@@ -197,22 +198,12 @@ int main(int argc, char *argv[])
     UInt_t EventID = *(vitec+0xa/2) << 16;
     EventID += *(vitec+0x8/2);
     
-    // output spybuffer using EventID?
-    // check that ID is consecutive?
-    
-    cout << "=======================================" << endl;
-    cout << "Received Event, ID=" << EventID << endl;
-    cout << "Dumping spybuffer: " << endl;
-    for(size_t n=0;n<spybuffer.size();n++) {
-      cout << hex 
-           << setfill('0') << setw(8)  
-           << n << " " 
-           << setfill('0') << setw(8)
-           << spybuffer[n] 
-           << dec << endl;
-    }
-    cout << "=======================================" << endl;
-    
+    cout << EventID << " "
+         << r.nWordStatus << " "
+         << r.nWordHeader << " "
+         << r.nStatusTries << " "
+         << r.nTrailerPos << " "
+         << r.ErrorCode << endl;
     
     // Set ACK of VITEC low,
     // indicates that we've finished reading event
