@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
   *(vitec+0x6/2) = 0;
   
   cout << "# Waiting for triggers..." << endl;
-  cout << "# EventID nWordStatus nWordHeader nStatusTries nTrailerPos ErrorCode" << endl;
+  cout << "# EventID nWordStatus nWordHeader nStatusTries nWordTries nTrailerPos ErrorCode" << endl;
   
   while(true) {
     // Wait for INT bit of VITEC to become high
@@ -186,6 +186,7 @@ int main(int argc, char *argv[])
          << r.nWordStatus << " "
          << r.nWordHeader << " "
          << r.nStatusTries << " "
+         << r.nWordTries << " "
          << r.nTrailerPos << " "
          << r.ErrorCode << endl;
     
