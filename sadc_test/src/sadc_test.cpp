@@ -20,7 +20,6 @@ struct gesica_result_t {
   UInt_t nWordTries;
   UInt_t nTrailerPos;
   UInt_t ErrorCode;
-  UInt_t EventIDSource;
   UInt_t EventIDTCS;
 };
 
@@ -50,14 +49,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
       return;
     }                
   }
-  
-  // read some event IDs
-  // source at 0x34
-  r.EventIDSource = *(gesica+0x34/4);
-  // TCS at 0x38
-  r.EventIDTCS = *(gesica+0x38/4);
-  
-  
+    
   // read first header from 0x28
   UInt_t header1 = *(gesica+0x28/4);
   // ...should be zero!
@@ -112,6 +104,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
     return;
   }
   r.nTrailerPos = r.nWordHeader;
+  r.EventIDTCS = spybuffer[0];
   
   // check the status reg again
   UInt_t status3 = *(gesica+0x24/4);
@@ -160,7 +153,7 @@ int main(int argc, char *argv[])
   *(vitec+0x6/2) = 0;
   
   cout << "# Waiting for triggers..." << endl;
-  cout << "# EventID EventIDSource EventIDTCS nWordStatus nWordHeader nStatusTries nWordTries nTrailerPos ErrorCode" << endl;
+  cout << "# EventID EventIDTCS nWordStatus nWordHeader nStatusTries nWordTries nTrailerPos ErrorCode" << endl;
   
   while(true) {
     // Wait for INT bit of VITEC to become high
@@ -188,7 +181,6 @@ int main(int argc, char *argv[])
     EventID += *(vitec+0x8/2);
     
     cout << EventID << " "
-         << r.EventIDSource << " "
          << r.EventIDTCS << " "
          << r.nWordStatus << " "
          << r.nWordHeader << " "
