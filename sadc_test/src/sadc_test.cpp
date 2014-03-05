@@ -136,7 +136,7 @@ int main(int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
   // the firmware ID is at 0xe
-  cout << "VITEC Firmware (should be 0xaa02): 0x"
+  cout << "# VITEC Firmware (should be 0xaa02): 0x"
        << hex << *(vitec+0xe/2) << dec << endl;
   
   // open VME access to GeSiCa at 
@@ -148,13 +148,14 @@ int main(int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
   // the module ID is at 0x0
-  cout << "GeSiCa Firmware (should be 0x440d5918): 0x"
+  cout << "# GeSiCa Firmware (should be 0x440d5918): 0x"
        << hex << *(gesica+0x0/4) << dec << endl;
   
   // Set ACK of VITEC low by default
   *(vitec+0x6/2) = 0;
   
-  cout << "Waiting for triggers..." << endl;
+  cout << "# Waiting for triggers..." << endl;
+  cout << "# EventID nWordStatus nWordHeader nStatusTries nTrailerPos ErrorCode" << endl;
   
   while(true) {
     // Wait for INT bit of VITEC to become high
