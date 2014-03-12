@@ -168,8 +168,11 @@ bool i2c_wait(vme32_t gesica) {
   // poll status register 0x4c bit 0,
   // wait until deasserted
   for(UInt_t n=0;n<100;n++) {
-    if(*(gesica+0x50/4) & 0x1 == 0) 
+    UInt_t status = *(gesica+0x4c/4);
+    if((status & 0x1) == 0) {
+      cout << "After " << n << " reads: 0x4c = 0x" << hex << (status & 0xffff) << dec << endl;
       return true;
+    }
   }
   cerr << "Did not see Status Bit deasserted, timeout." << endl;
   return false;
@@ -177,34 +180,33 @@ bool i2c_wait(vme32_t gesica) {
 
 UInt_t i2c_read(vme32_t gesica, UInt_t nSADC, 
                 UInt_t adc_side, UInt_t addr) {
-  // enable all SADC cards?
-  // 0x50=EI2CPortSelect: Front-End ID select
-  *(gesica+0x50/4) = 0xff;
-  // 0x48=EI2CAddrCtl: i2C Address/Control
-  // read 1 byte, no reset, initiate i2c
-  // address 0xe
-  *(gesica+0x48/4) = 0xe94;
-  if(!i2c_wait(gesica))
-    return 0xffff;
-  
-  // set to specific SADC 
+  // set to specific SADC,
+  // what does that mean?
+  // Note that 0x2c != 0x3c What is right?
   // 0x50=EI2CPortSelect: Front-End ID select
   *(gesica+0x50/4) = nSADC;
   // 0x2c=EIHlPort: HotLink select
   *(gesica+0x2c/4) = nSADC;
-  
-  // write in address/control
-  // 0x98 = 2 bytes read, no reset, initiate i2c
-  *(gesica+0x48/4) = 
-      0x4000 + 
-      ((adc_side << 13) & 0x2000) +
-      ((addr << 8) & 0x1f00) 
-      + 0x98;
+
+  // issue a reset, does also not help...
+  *(gesica+0x48/4) = 0x40;
   if(!i2c_wait(gesica))
     return 0xffff;
-  
+
+  // write in address/control register (acr)
+  UInt_t acr =
+      0x4000 +
+      ((adc_side << 13) & 0x2000) +
+      ((addr << 8) & 0x1f00)
+      + 0x98; // 0x98 = 2 bytes read, no reset, initiate i2c
+  cout << "Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+  *(gesica+0x48/4) = acr;
+
+  if(!i2c_wait(gesica))
+    return 0xffff;
+
   // read 16bits from low register 0x44
-  return *(gesica+0x48/4) & 0xffff;
+  return *(gesica+0x44/4) & 0xffff;
 }
 
 
@@ -239,13 +241,13 @@ int main(int argc, char *argv[])
        << hex << *(gesica+0x0/4) << dec << endl;
   
   // dump i2c registers of connected iSADC cards
-  for(UInt_t iSADC=0;iSADC<6;iSADC++) {
-    for(UInt_t adc_side=0;adc_side<2;adc_side++) {
-      for(UInt_t reg=0;reg<0x1f;reg++)
-      cout << "# iSADC " << iSADC << ", Side " << adc_side 
+  for(UInt_t iSADC=0;iSADC<1;iSADC++) {
+    for(UInt_t adc_side=0;adc_side<1;adc_side++) {
+      for(UInt_t reg=0x0;reg<0xa;reg++)
+      cout << "iSADC=" << iSADC << ", Side=" << adc_side 
            << ", Reg 0x" << hex << reg 
            << " = 0x"
-           << i2c_read(gesica, iSADC, adc_side, 0x2) 
+           << i2c_read(gesica, iSADC, adc_side, reg) 
            << dec << endl;      
     }
   }
