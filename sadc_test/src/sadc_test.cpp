@@ -131,8 +131,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   }
     
   if(r.nFifoReads != r.nWordHeader) {
-    // this is probably not a serious error...
-    // so continue and no reset
+    // Don't know if this can happen at all...
     r.ErrorCode |= 1 << 9;
     *(gesica+0x0/4) = 1;
     return;
@@ -165,6 +164,50 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   }
 }
 
+bool i2c_wait(vme32_t gesica) {
+  // poll status register 0x4c bit 0,
+  // wait until deasserted
+  for(UInt_t n=0;n<100;n++) {
+    if(*(gesica+0x50/4) & 0x1 == 0) 
+      return true;
+  }
+  cerr << "Did not see Status Bit deasserted, timeout." << endl;
+  return false;
+}
+
+UInt_t i2c_read(vme32_t gesica, UInt_t nSADC, 
+                UInt_t adc_side, UInt_t addr) {
+  // enable all SADC cards?
+  // 0x50=EI2CPortSelect: Front-End ID select
+  *(gesica+0x50/4) = 0xff;
+  // 0x48=EI2CAddrCtl: i2C Address/Control
+  // read 1 byte, no reset, initiate i2c
+  // address 0xe
+  *(gesica+0x48/4) = 0xe94;
+  if(!i2c_wait(gesica))
+    return 0xffff;
+  
+  // set to specific SADC 
+  // 0x50=EI2CPortSelect: Front-End ID select
+  *(gesica+0x50/4) = nSADC;
+  // 0x2c=EIHlPort: HotLink select
+  *(gesica+0x2c/4) = nSADC;
+  
+  // write in address/control
+  // 0x98 = 2 bytes read, no reset, initiate i2c
+  *(gesica+0x48/4) = 
+      0x4000 + 
+      ((adc_side << 13) & 0x2000) +
+      ((addr << 8) & 0x1f00) 
+      + 0x98;
+  if(!i2c_wait(gesica))
+    return 0xffff;
+  
+  // read 16bits from low register 0x44
+  return *(gesica+0x48/4) & 0xffff;
+}
+
+
 int main(int argc, char *argv[])
 {
   if (argc != 1) {
@@ -194,6 +237,18 @@ int main(int argc, char *argv[])
   // the module ID is at 0x0
   cout << "# GeSiCa Firmware (should be 0x440d5918): 0x"
        << hex << *(gesica+0x0/4) << dec << endl;
+  
+  // dump i2c registers of connected iSADC cards
+  for(UInt_t iSADC=0;iSADC<6;iSADC++) {
+    for(UInt_t adc_side=0;adc_side<2;adc_side++) {
+      for(UInt_t reg=0;reg<0x1f;reg++)
+      cout << "# iSADC " << iSADC << ", Side " << adc_side 
+           << ", Reg 0x" << hex << reg 
+           << " = 0x"
+           << i2c_read(gesica, iSADC, adc_side, 0x2) 
+           << dec << endl;      
+    }
+  }
   
   // Set ACK of VITEC low by default
   *(vitec+0x6/2) = 0;
