@@ -2,6 +2,7 @@
 #include <iomanip>
 #include <cstdlib>
 #include <vector>
+#include <netinet/in.h>
 
 extern "C" {
 #include "vmebus.h"
@@ -168,7 +169,7 @@ bool i2c_wait(vme32_t gesica) {
   // poll status register 0x4c bit 0,
   // wait until deasserted
   for(UInt_t n=0;n<100;n++) {
-    UInt_t status = *(gesica+0x4c/4);
+    UInt_t status = ntohs(*(gesica+0x4c/4));
     if((status & 0x1) == 0) {
       cout << "After " << n << " reads: 0x4c = 0x" << hex << (status & 0xffff) << dec << endl;
       return true;
@@ -181,13 +182,13 @@ bool i2c_wait(vme32_t gesica) {
 bool i2c_reset(vme32_t gesica) {
   // issue a reset, does also not help...
   cout << "Resetting i2c state machine..." << endl;
-  *(gesica+0x48/4) = 0x40;
+  *(gesica+0x48/4) = htons(0x40);
   return i2c_wait(gesica);
 }
 
 void i2c_set_port(vme32_t gesica, UInt_t port_id) {
-  *(gesica+0x2c/4) = port_id & 0xff;
-  *(gesica+0x50/4) = 0xff; // is this broadcast mode?
+  *(gesica+0x2c/4) = htonl(port_id & 0xff);
+  *(gesica+0x50/4) = htons(0xff); // is this broadcast mode?
 }
 
 UInt_t i2c_read(vme32_t gesica, UInt_t addr) {
@@ -197,18 +198,18 @@ UInt_t i2c_read(vme32_t gesica, UInt_t addr) {
       ((addr << 8) & 0x7f00)
       + 0x94; // 0x94 = 1 byte read, no reset, initiate i2c
   cout << "Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
-  *(gesica+0x48/4) = acr;
+  *(gesica+0x48/4) = htons(acr);
 
   if(!i2c_wait(gesica))
     return 0xffff;
   
-  if((*(gesica+0x4c/4) & 0xf8) != 0x50) {
+  if((ntohs(*(gesica+0x4c/4)) & 0xf8) != 0x50) {
     cerr << "Status Reg 0x4c indicates error." << endl;
     return 0xffff;
   }  
   
   // read 8bits from low register 0x44
-  return *(gesica+0x44/4) & 0xff;
+  return ntohs(*(gesica+0x44/4)) & 0xff;
 }
 
 
