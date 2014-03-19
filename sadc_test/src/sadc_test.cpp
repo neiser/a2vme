@@ -178,35 +178,37 @@ bool i2c_wait(vme32_t gesica) {
   return false;
 }
 
-UInt_t i2c_read(vme32_t gesica, UInt_t nSADC, 
-                UInt_t adc_side, UInt_t addr) {
-  // set to specific SADC,
-  // what does that mean?
-  // Note that 0x2c != 0x3c What is right?
-  // 0x50=EI2CPortSelect: Front-End ID select
-  *(gesica+0x50/4) = nSADC;
-  // 0x2c=EIHlPort: HotLink select
-  *(gesica+0x2c/4) = nSADC;
-
+bool i2c_reset(vme32_t gesica) {
   // issue a reset, does also not help...
+  cout << "Resetting i2c state machine..." << endl;
   *(gesica+0x48/4) = 0x40;
-  if(!i2c_wait(gesica))
-    return 0xffff;
+  return i2c_wait(gesica);
+}
+
+void i2c_set_port(vme32_t gesica, UInt_t port_id) {
+  *(gesica+0x2c/4) = port_id & 0xff;
+  *(gesica+0x50/4) = 0xff; // is this broadcast mode?
+}
+
+UInt_t i2c_read(vme32_t gesica, UInt_t addr) {
 
   // write in address/control register (acr)
   UInt_t acr =
-      0x4000 +
-      ((adc_side << 13) & 0x2000) +
-      ((addr << 8) & 0x1f00)
-      + 0x98; // 0x98 = 2 bytes read, no reset, initiate i2c
+      ((addr << 8) & 0x7f00)
+      + 0x94; // 0x94 = 1 byte read, no reset, initiate i2c
   cout << "Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
   *(gesica+0x48/4) = acr;
 
   if(!i2c_wait(gesica))
     return 0xffff;
-
-  // read 16bits from low register 0x44
-  return *(gesica+0x44/4) & 0xffff;
+  
+  if((*(gesica+0x4c/4) & 0xf8) != 0x50) {
+    cerr << "Status Reg 0x4c indicates error." << endl;
+    return 0xffff;
+  }  
+  
+  // read 8bits from low register 0x44
+  return *(gesica+0x44/4) & 0xff;
 }
 
 
@@ -240,16 +242,23 @@ int main(int argc, char *argv[])
   cout << "# GeSiCa Firmware (should be 0x440d5918): 0x"
        << hex << *(gesica+0x0/4) << dec << endl;
   
+  if(!i2c_reset(gesica)) {
+    cerr << "I2C reset failed" << endl;
+    exit(EXIT_FAILURE);
+  }
+  
+  UInt_t vme_SCR = *(gesica+0x20/4);
   // dump i2c registers of connected iSADC cards
-  for(UInt_t iSADC=0;iSADC<1;iSADC++) {
-    for(UInt_t adc_side=0;adc_side<1;adc_side++) {
-      for(UInt_t reg=0x0;reg<0xa;reg++)
-      cout << "iSADC=" << iSADC << ", Side=" << adc_side 
-           << ", Reg 0x" << hex << reg 
-           << " = 0x"
-           << i2c_read(gesica, iSADC, adc_side, reg) 
-           << dec << endl;      
+  for(UInt_t port_id=0;port_id<8;port_id++) {
+    if( (vme_SCR & (1 << (port_id+8))) == 0) {
+      cerr << "Port ID " << port_id << " not connected." << endl;
+      continue;
     }
+    i2c_set_port(gesica, port_id);
+    cout << "Port ID=" << port_id << ", "
+         << "Hardwired ID=0x" << hex << i2c_read(gesica, 0) << dec << ", "
+         << "Geo ID=0x" << hex << i2c_read(gesica, 1) << dec
+         << endl;
   }
   
   // Set ACK of VITEC low by default
