@@ -255,9 +255,11 @@ int main(int argc, char *argv[])
       continue;
     }
     i2c_set_port(gesica, port_id);
+    UInt_t hard_id = i2c_read(gesica, 0);
+    UInt_t geo_id = i2c_read(gesica, 1);
     cout << "Port ID=" << port_id << ", "
-         << "Hardwired ID=0x" << hex << i2c_read(gesica, 0) << dec << ", "
-         << "Geo ID=0x" << hex << i2c_read(gesica, 1) << dec
+         << "Hardwired ID=0x" << hex << hard_id << dec << ", "
+         << "Geo ID=0x" << hex << geo_id << dec
          << endl;
   }
   
