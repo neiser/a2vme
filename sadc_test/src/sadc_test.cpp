@@ -204,7 +204,7 @@ UInt_t i2c_read(vme32_t gesica, UInt_t addr) {
   
   if((*(gesica+0x4c/4) & 0xf8) != 0x50) {
     cerr << "Status Reg 0x4c indicates error." << endl;
-    return 0xffff;
+    //return 0xffff;
   }  
   
   // read 8bits from low register 0x44
