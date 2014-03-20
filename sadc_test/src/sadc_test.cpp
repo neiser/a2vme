@@ -164,13 +164,18 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
   }
 }
 
-bool i2c_wait(vme32_t gesica) {
+bool i2c_wait(vme32_t gesica, bool check_ack) {
   // poll status register 0x4c bit 0,
   // wait until deasserted
   for(UInt_t n=0;n<100;n++) {
     UInt_t status = *(gesica+0x4c/4);
     if((status & 0x1) == 0) {
-      cout << "After " << n << " reads: 0x4c = 0x" << hex << (status & 0xffff) << dec << endl;
+      cout << "# After " << n << " reads: 0x4c = 0x" << hex << (status & 0x7f) << dec << endl;
+      // check acknowledge bit
+      if(check_ack && (status & 0x8) != 0) {
+        cerr << "Address or data was not acknowledged " << endl;
+        return false;
+      }
       return true;
     }
   }
@@ -180,37 +185,52 @@ bool i2c_wait(vme32_t gesica) {
 
 bool i2c_reset(vme32_t gesica) {
   // issue a reset, does also not help...
-  cout << "Resetting i2c state machine..." << endl;
+  cout << "# Resetting i2c state machine..." << endl;
   *(gesica+0x48/4) = 0x40;
-  return i2c_wait(gesica);
+  return i2c_wait(gesica, false);
 }
 
-void i2c_set_port(vme32_t gesica, UInt_t port_id) {
+void i2c_set_port(vme32_t gesica, UInt_t port_id, bool broadcast) {
   *(gesica+0x2c/4) = port_id & 0xff;
-  *(gesica+0x50/4) = 0xff; // is this broadcast mode?
+  if(broadcast) {
+    *(gesica+0x50/4) = 0xff; // is this broadcast mode?
+  }
+  else {
+    *(gesica+0x50/4) = port_id & 0xff;
+  }
 }
 
-UInt_t i2c_read(vme32_t gesica, UInt_t addr) {
+bool i2c_read(vme32_t gesica, UInt_t addr, UInt_t& data) {
 
   // write in address/control register (acr)
   UInt_t acr =
       ((addr << 8) & 0x7f00)
-      + 0x94; // 0x94 = 1 byte read, no reset, initiate i2c
-  cout << "Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+      + 0x98; // 0x98 = 2 byte read, no reset, initiate i2c
+  cout << "# Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
   *(gesica+0x48/4) = acr;
 
-  if(!i2c_wait(gesica))
-    return 0xffff;
-  
-  if((*(gesica+0x4c/4) & 0xf8) != 0x50) {
-    cerr << "Status Reg 0x4c indicates error." << endl;
-    //return 0xffff;
-  }  
-  
-  // read 8bits from low register 0x44
-  return *(gesica+0x44/4) & 0xff;
+  if(!i2c_wait(gesica, true))
+    return false;
+
+  // read 16bits from low register 0x44
+  data = *(gesica+0x44/4) & 0xffff;
+  return true;
 }
 
+bool i2c_write(vme32_t gesica, UInt_t addr, UInt_t data) {
+
+  // write 16bits to low register 0x40
+  *(gesica+0x40/4) = data & 0xffff;
+
+  // write in address/control register (acr)
+  UInt_t acr =
+      ((addr << 8) & 0x7f00)
+      + 0x88; // 0x88 = 2 byte write, no reset, initiate i2c
+  cout << "# Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+  *(gesica+0x48/4) = acr;
+
+  return i2c_wait(gesica, true);
+}
 
 int main(int argc, char *argv[])
 {
@@ -247,22 +267,74 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
   
-  UInt_t vme_SCR = *(gesica+0x20/4);
-  // dump i2c registers of connected iSADC cards
-  for(UInt_t port_id=0;port_id<8;port_id++) {
-    if( (vme_SCR & (1 << (port_id+8))) == 0) {
+
+  // SCR = status and control register
+  // enable readout via VME, but disable everything else like debugging pulsers
+  *(gesica+0x20/4) = 0x4;
+  UInt_t gesica_SCR = *(gesica+0x20/4);
+  // check if clocks are locked (if not there's a TCS problem)
+  if((gesica_SCR & 0x1) == 0) {
+    cerr << "TCS clock not locked" << endl;
+    exit(EXIT_FAILURE);
+  }
+  if((gesica_SCR & 0x2) == 0) {
+    cerr << "Internal clocks not locked" << endl;
+    exit(EXIT_FAILURE);
+  }
+
+  // Init connected iSADC cards
+  for(UInt_t port_id=0;port_id<6;port_id++) {
+    if( (gesica_SCR & (1 << (port_id+8))) == 0) {
       cerr << "Port ID " << port_id << " not connected." << endl;
       continue;
     }
-    i2c_set_port(gesica, port_id);
-    UInt_t hard_id = i2c_read(gesica, 0);
-    UInt_t geo_id = i2c_read(gesica, 1);
+    // set to broadcast mode
+    i2c_set_port(gesica, port_id, true);
+    // read hardwired id
+    UInt_t hard_id;
+    if(!i2c_read(gesica, 0x0, hard_id))
+      continue;
+    hard_id &= 0xff; // (only lower 8 bits)
+    // write geo id as port_id:
+    // hard_id as the lower 8 bits, port id the higher 8 bits!
+    if(!i2c_write(gesica, 0x1, hard_id  + (port_id <<8)))
+      continue;
+    // readback geo id
+    UInt_t geo_id;
+    if(!i2c_read(gesica, 0x1, geo_id))
+      continue;
+    geo_id &= 0xff; // (only lower 8 bits)
+    if(geo_id != port_id) {
+      cerr << "Setting Geo ID for port " << port_id << " failed: GeoID=" << geo_id << endl;
+      continue;
+    }
     cout << "Port ID=" << port_id << ", "
          << "Hardwired ID=0x" << hex << hard_id << dec << ", "
          << "Geo ID=0x" << hex << geo_id << dec
          << endl;
+    // enable interface for readout
+    *(gesica+0x20/4) |= 1 << (port_id+16);
   }
-  
+
+  // read some registers
+  for(UInt_t port_id=0;port_id<6;port_id++) {
+    // no broadcast mode => access single SADCs
+    i2c_set_port(gesica, port_id, false);
+
+
+    for(UInt_t reg=0x0;reg<0x3;reg++) {
+      UInt_t addr = reg;
+      UInt_t data;
+      if(!i2c_read(gesica, addr, data))
+        continue;
+      cout << "Port=" << port_id
+           << hex << " 0x" << addr
+           << "=0x" << data << dec << endl;
+    }
+  }
+
+  exit(EXIT_SUCCESS);
+
   // Set ACK of VITEC low by default
   *(vitec+0x6/2) = 0;
   
