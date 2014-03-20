@@ -200,36 +200,74 @@ void i2c_set_port(vme32_t gesica, UInt_t port_id, bool broadcast) {
   }
 }
 
-bool i2c_read(vme32_t gesica, UInt_t addr, UInt_t& data) {
+bool i2c_read(vme32_t gesica, UInt_t bytes, UInt_t addr, UInt_t& data) {
+  // bytes must be between 1 and 4
 
   // write in address/control register (acr)
-  UInt_t acr =
-      ((addr << 8) & 0x7f00)
-      + 0x98; // 0x98 = 2 byte read, no reset, initiate i2c
-  cout << "# Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+  // always set bit7 (trigger i2c transmission),
+  // and bit4 (read mode)
+  UInt_t acr = (1 << 7) + (1 << 4);
+  // this nicely configures the i2c number of bytes
+  acr |= bytes << 2;
+  // set the address in the upper byte
+  acr |= (addr << 8) & 0x7f00;
+  cout << "# Read Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
   *(gesica+0x48/4) = acr;
 
   if(!i2c_wait(gesica, true))
     return false;
 
-  // read 16bits from low register 0x44
-  data = *(gesica+0x44/4) & 0xffff;
+
+  // always read the lower data register 0x44
+  data = *(gesica+0x44/4);
+
+  // take care of upper data reg 0x58 and masking
+  UInt_t mask = bytes % 2 == 0 ? 0xffff : 0xff;
+  if(bytes>2) {
+    data |= (*(gesica+0x58/4) & mask) << 16;
+  }
+  else {
+    data &= mask;
+  }
   return true;
 }
 
-bool i2c_write(vme32_t gesica, UInt_t addr, UInt_t data) {
+bool i2c_write(vme32_t gesica, UInt_t bytes, UInt_t addr, UInt_t data) {
+  // bytes must be between 1 and 4
 
-  // write 16bits to low register 0x40
+  // always write 16bits to low register 0x40
   *(gesica+0x40/4) = data & 0xffff;
 
+  // if needed, use upper data register 0x54
+  if(bytes>2) {
+    *(gesica+0x54/4) = (data >> 16) & 0xffff;
+  }
+
   // write in address/control register (acr)
-  UInt_t acr =
-      ((addr << 8) & 0x7f00)
-      + 0x88; // 0x88 = 2 byte write, no reset, initiate i2c
-  cout << "# Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+  // set bit7 (trigger i2c transmission),
+  // but bit4=0 (write mode)
+  UInt_t acr = 1 << 7;
+  // assuming bytes>0 && bytes<4 (the caller should know that)
+  // this nicely configures the i2c number of bytes
+  acr |= bytes << 2;
+  // set the address in the upper byte
+  acr |= (addr << 8) & 0x7f00;
+  cout << "# Write Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
   *(gesica+0x48/4) = acr;
 
   return i2c_wait(gesica, true);
+}
+
+bool i2c_read_reg(vme32_t gesica, UInt_t adc_side, UInt_t reg, UInt_t& data) {
+  UInt_t addr = 0x40 + (adc_side << 5) + reg;
+
+  if(!i2c_write(gesica, 2, addr, 0))
+    return false;
+
+  if(!i2c_read(gesica, 2, addr, data))
+    return false;
+
+  return true;
 }
 
 int main(int argc, char *argv[])
@@ -292,18 +330,16 @@ int main(int argc, char *argv[])
     i2c_set_port(gesica, port_id, true);
     // read hardwired id
     UInt_t hard_id;
-    if(!i2c_read(gesica, 0x0, hard_id))
+    if(!i2c_read(gesica, 1, 0x0, hard_id))
       continue;
-    hard_id &= 0xff; // (only lower 8 bits)
     // write geo id as port_id:
     // hard_id as the lower 8 bits, port id the higher 8 bits!
-    if(!i2c_write(gesica, 0x1, hard_id  + (port_id <<8)))
+    if(!i2c_write(gesica, 2, 0x1, hard_id  + (port_id <<8)))
       continue;
     // readback geo id
     UInt_t geo_id;
-    if(!i2c_read(gesica, 0x1, geo_id))
+    if(!i2c_read(gesica, 1, 0x1, geo_id))
       continue;
-    geo_id &= 0xff; // (only lower 8 bits)
     if(geo_id != port_id) {
       cerr << "Setting Geo ID for port " << port_id << " failed: GeoID=" << geo_id << endl;
       continue;
@@ -312,7 +348,8 @@ int main(int argc, char *argv[])
          << "Hardwired ID=0x" << hex << hard_id << dec << ", "
          << "Geo ID=0x" << hex << geo_id << dec
          << endl;
-    // enable interface for readout
+
+    // enable interface for readout (two VME accesses...)
     *(gesica+0x20/4) |= 1 << (port_id+16);
   }
 
@@ -323,12 +360,11 @@ int main(int argc, char *argv[])
 
 
     for(UInt_t reg=0x0;reg<0x3;reg++) {
-      UInt_t addr = reg;
       UInt_t data;
-      if(!i2c_read(gesica, addr, data))
-        continue;
+      i2c_read_reg(gesica, 0, reg, data);
+
       cout << "Port=" << port_id
-           << hex << " 0x" << addr
+           << hex << " 0x" << reg
            << "=0x" << data << dec << endl;
     }
   }
