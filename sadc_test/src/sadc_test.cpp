@@ -2,6 +2,9 @@
 #include <iomanip>
 #include <cstdlib>
 #include <vector>
+#include <fstream>
+#include <sstream>
+#include <bitset>
 
 extern "C" {
 #include "vmebus.h"
@@ -170,7 +173,7 @@ bool i2c_wait(vme32_t gesica, bool check_ack) {
   for(UInt_t n=0;n<100;n++) {
     UInt_t status = *(gesica+0x4c/4);
     if((status & 0x1) == 0) {
-      cout << "# After " << n << " reads: 0x4c = 0x" << hex << (status & 0x7f) << dec << endl;
+      //cout << "# After " << n << " reads: 0x4c = 0x" << hex << (status & 0x7f) << dec << endl;
       // check acknowledge bit
       if(check_ack && (status & 0x8) != 0) {
         cerr << "Address or data was not acknowledged " << endl;
@@ -211,7 +214,7 @@ bool i2c_read(vme32_t gesica, UInt_t bytes, UInt_t addr, UInt_t& data) {
   acr |= bytes << 2;
   // set the address in the upper byte
   acr |= (addr << 8) & 0x7f00;
-  cout << "# Read Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+  //cout << "# Read Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
   *(gesica+0x48/4) = acr;
 
   if(!i2c_wait(gesica, true))
@@ -252,7 +255,7 @@ bool i2c_write(vme32_t gesica, UInt_t bytes, UInt_t addr, UInt_t data) {
   acr |= bytes << 2;
   // set the address in the upper byte
   acr |= (addr << 8) & 0x7f00;
-  cout << "# Write Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
+  //cout << "# Write Address/Control: 0x48 = 0x" << hex << acr << dec << endl;
   *(gesica+0x48/4) = acr;
 
   return i2c_wait(gesica, true);
@@ -304,13 +307,96 @@ bool i2c_write_reg(vme32_t gesica, UInt_t adc_side, UInt_t reg, UInt_t data) {
   return true;
 }
 
+bool load_rbt(const char* rbt_filename, vector<UInt_t>& data) {
+  ifstream rbt_file(rbt_filename);
+  if(!rbt_file.is_open()) {
+    cerr << "Could not open RBT file " << rbt_filename << endl;
+    return false;
+  }
+  cout << "Opened RBT file " << rbt_filename << endl;
+  string line;
+  UInt_t lineno = 0;
+  UInt_t numOfBits = 0;
+  while(getline(rbt_file,line)) {
+    lineno++;
+    if(lineno==7) {
+      stringstream ss(line);
+      ss >> line; //  dump leading string
+      ss >> numOfBits;
+    }
+    if(lineno<=7)
+      continue;
+
+    // convert bit line to number
+    bitset<32> bits(line);
+    UInt_t word = bits.to_ulong();
+    data.push_back((word >> 24) & 0xff);
+    data.push_back((word >> 16) & 0xff);
+    data.push_back((word >>  8) & 0xff);
+    data.push_back((word >>  0) & 0xff);
+  }
+  // check
+  if(data.size() != numOfBits/8) {
+    cerr << "Not enough bits read as promised in header" << endl;
+    return false;
+  }
+  return true;
+}
+
+bool i2c_program_sadc(vme32_t gesica, const char* rbt_filename) {
+  vector<UInt_t> rbt_data;
+  if(!load_rbt(rbt_filename, rbt_data))
+    return false;
+
+  //cout << hex << (UInt_t)rbt_data[4] << dec << endl;
+
+  // reset FPGA
+  if(!i2c_write(gesica, 1, 2, 0x0))
+    return false;
+
+  // set program bit
+  if(!i2c_write(gesica, 1, 2, 0x4))
+    return false;
+
+  // wait for init
+  UInt_t nTries = 0;
+  UInt_t status = 0;
+  do {
+    if(!i2c_read(gesica, 1, 2, status))
+      return false;
+    nTries++;
+    if(nTries==10000) {
+      cerr << "Reached maximum wait time for init programming. Last status = " << status << endl;
+      return false;
+    }
+  }
+  while((status & 0x1) == 0);
+
+  cout << "Programming SADC..." << endl;
+  // write the file, 2 bytes at once
+  for(UInt_t i=0;i<rbt_data.size();i+=2) {
+    UInt_t i2c_data = (rbt_data[i+1] << 8) + rbt_data[i];
+    if(!i2c_write(gesica, 2, 3, i2c_data)) {
+      cerr << "Failed writing at bytes=" << i << endl;
+      return false;
+    }
+    if(i % (1 << 14) == 0)
+      cout << "." << flush;
+  }
+  cout << endl;
+  return true;
+}
+
 int main(int argc, char *argv[])
 {
-  if (argc != 1) {
-    cerr << "This program does not take arguments." << endl;
+  if (argc > 2) {
+    cerr << "This program does not take more than one argument." << endl;
     exit(EXIT_FAILURE);
   }
   
+
+
+
   // open VME access to VITEC at base address 0x0, size 0x1000
   // Short I/O = 16bit addresses, 16bit data
   vme16_t vitec = (vme16_t)vmesio(0x0, 0x1000);
@@ -387,17 +473,23 @@ int main(int argc, char *argv[])
     *(gesica+0x20/4) |= 1 << (port_id+16);
   }
 
+  if(argc==2) {
+    i2c_set_port(gesica, 1, false);
+    i2c_program_sadc(gesica, argv[1]);
+    //exit(EXIT_SUCCESS);
+  }
+
   // set some registers
-  i2c_set_port(gesica, 5, false);
-  i2c_write_reg(gesica, 0, 0x10, 0xf);
+  i2c_set_port(gesica, 0, false);
+  i2c_write_reg(gesica, 0, 0x0, 0x45);
+  i2c_write_reg(gesica, 0, 0x1, 0x5a);
 
   // read some registers
   for(UInt_t port_id=0;port_id<6;port_id++) {
     // no broadcast mode => access single SADCs?
     i2c_set_port(gesica, port_id, false);
 
-
-    for(UInt_t reg=0x10;reg<0x11;reg++) {
+    for(UInt_t reg=0x0;reg<0x3;reg++) {
       UInt_t data;
       i2c_read_reg(gesica, 0, reg, data);
 
