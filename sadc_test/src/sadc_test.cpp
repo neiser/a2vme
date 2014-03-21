@@ -27,7 +27,7 @@ struct gesica_result_t {
 
 // returns the 32bit words in the spybuffer, 
 // if some could be read...
-void readout_gesica(vme32_t gesica, gesica_result_t& r) {
+void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer = false) {
   // this is motivated by the SpyRead() method in TVME_GeSiCA.h
   
   // read status register,
@@ -164,11 +164,11 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r) {
     *(gesica+0x0/4) = 1;
     return;
   }
+  
+  if(!dump_spybuffer)
+    return;
+  
 }
-
-
-
-
 
 int main(int argc, char *argv[])
 {
@@ -184,43 +184,92 @@ int main(int argc, char *argv[])
     cerr << "Error opening VME access to VITEC." << endl;
     exit (EXIT_FAILURE);
   }
-  // the firmware ID is at 0xe
-  cout << "# VITEC Firmware (should be 0xaa02): 0x"
-       << hex << *(vitec+0xe/2) << dec << endl;
+  // the firmware ID is at 0xe, should be 0xaa02
+  if(*(vitec+0xe/2) != 0xaa02) {
+    cerr << "VITEC firmware not 0xaa02...exit" << endl;
+    exit(EXIT_FAILURE);
+  }
   
   // open VME access to GeSiCa at 
   // base adress 0xdd1000 (vme-cb-adc-1a), size 0x1000
-  
   vme32_t gesica = (vme32_t)vmestd(0xdd1000, 0x1000);
   if (gesica == NULL) {
     cerr << "Error opening VME access to GeSiCa." << endl;
     exit (EXIT_FAILURE);
   }
-
+  
+  vector<UInt_t> ports;
+  if(!init_gesica(gesica, ports)) {
+    cerr << "Detecting the SADC modules went wrong..." << endl;
+    exit(EXIT_FAILURE);
+  }
+  
   // enable readout via VME, but disable everything else like debugging pulsers
   *(gesica+0x20/4) = 0x4;
   
-  // set some registers
-  i2c_set_port(gesica, 0);
-  i2c_write_reg(gesica, 0, 0x0, 0x45);
-  i2c_write_reg(gesica, 0, 0x1, 0x5a);
-
-  // read some registers
-  for(UInt_t port_id=0;port_id<6;port_id++) {
-    // no broadcast mode => access single SADCs?
+  // only readout port 0 (init_gesica above enables all it can find)
+  
+  
+  // set registers according to Igor
+  for(UInt_t i=0;i<ports.size();i++) {
+    UInt_t port_id = ports[i];
+    i2c_set_port(gesica, port_id);    
+    for(UInt_t adc_side=0;adc_side<2;adc_side++) {
+      // set latency to 89=69+20, maybe we catch some NaI signals..
+      i2c_write_reg(gesica, adc_side, 0x0, 89);        
+      // 10 samples per event
+      i2c_write_reg(gesica, adc_side, 0x1, 10);
+      // set latch all mode 
+      // 0x0 = for firmware 100
+      // 0x1 = for firmware 104 ???
+      i2c_write_reg(gesica, adc_side, 0x3, 0);
+      
+      // set baseline integral
+      i2c_write_reg(gesica, adc_side, 0x4, 0);
+      i2c_write_reg(gesica, adc_side, 0x5, 2);
+      
+      // set signal integral
+      i2c_write_reg(gesica, adc_side, 0x6, 0);
+      i2c_write_reg(gesica, adc_side, 0x7, 10);
+      
+      // set tail integral
+      i2c_write_reg(gesica, adc_side, 0x8, 5);
+      i2c_write_reg(gesica, adc_side, 0x9, 5);      
+            
+      // set all thresholds to zero
+      for(UInt_t reg=0x10;reg<0x20;reg++) {
+        i2c_write_reg(gesica, adc_side, reg, 0);        
+      }
+    } 
+  }
+  
+  // read all registers
+  for(UInt_t i=0;i<ports.size();i++) {
+    UInt_t port_id = ports[i];
     i2c_set_port(gesica, port_id);
-
-    for(UInt_t reg=0x0;reg<0x3;reg++) {
-      UInt_t data;
-      i2c_read_reg(gesica, 0, reg, data);
-
-      cout << "Port=" << port_id
-           << hex << " 0x" << reg
-           << "=0x" << data << dec << endl;
+    for(UInt_t adc_side=0;adc_side<2;adc_side++) {
+      // dump config/status regs
+      for(UInt_t reg=0x0;reg<0xa;reg++) {
+        UInt_t data;
+        i2c_read_reg(gesica, adc_side, reg, data);
+        
+        cout << "Port=" << port_id
+             << "ADC side=" << adc_side
+             << hex << ": config 0x" << reg
+             << "=0x" << data << dec << endl;
+      }
+      // dump thresholds
+      for(UInt_t reg=0x10;reg<0x20;reg++) {
+        UInt_t data;
+        i2c_read_reg(gesica, adc_side, reg, data);
+        
+        cout << "Port=" << port_id
+             << "ADC side=" << adc_side
+             << hex << ": threshold 0x" << reg
+             << "=0x" << data << dec << endl;
+      }
     }
   }
-
-  exit(EXIT_SUCCESS);
 
   // Set ACK of VITEC low by default
   *(vitec+0x6/2) = 0;
@@ -265,6 +314,8 @@ int main(int argc, char *argv[])
     // Set ACK of VITEC low,
     // indicates that we've finished reading event
     *(vitec+0x6/2) = 0;
+    
+    break;
     
   }
   

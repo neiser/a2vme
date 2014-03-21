@@ -198,6 +198,8 @@ bool init_gesica(vme32_t gesica,
     return false;
   }
   
+  *(gesica+0x20/4) = 0x0; // disable everything by default
+  
   // if the Gesica FPGA itself is programmed, 
   // the TCS (and thus i2c) might not be working...
   if(skip_i2c)
