@@ -264,7 +264,7 @@ int main(int argc, char *argv[])
         i2c_read_reg(gesica, adc_side, reg, data);
         
         cout << "Port=" << port_id
-             << "ADC side=" << adc_side
+             << " ADC side=" << adc_side
              << hex << ": config 0x" << reg
              << "=0x" << data << dec << endl;
       }
@@ -274,7 +274,7 @@ int main(int argc, char *argv[])
         i2c_read_reg(gesica, adc_side, reg, data);
         
         cout << "Port=" << port_id
-             << "ADC side=" << adc_side
+             << " ADC side=" << adc_side
              << hex << ": threshold 0x" << reg
              << "=0x" << data << dec << endl;
       }
@@ -302,7 +302,7 @@ int main(int argc, char *argv[])
     
     // ******* START GESICA READOUT
     gesica_result_t r = {};
-    readout_gesica(gesica, r);
+    readout_gesica(gesica, r, true);
     // ******* END GESICA READOUT
     
     // Wait for Serial ID received, bit4 should become high
