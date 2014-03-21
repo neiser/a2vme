@@ -197,74 +197,18 @@ int main(int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
 
-  // the module ID is at 0x0
-  cout << "# GeSiCa Firmware (should be 0x440d5918): 0x"
-       << hex << *(gesica+0x0/4) << dec << endl;
-  
-  if(!i2c_reset(gesica)) {
-    cerr << "I2C reset failed" << endl;
-    exit(EXIT_FAILURE);
-  }
-  
-
-  // SCR = status and control register
   // enable readout via VME, but disable everything else like debugging pulsers
   *(gesica+0x20/4) = 0x4;
-  UInt_t gesica_SCR = *(gesica+0x20/4);
-  // check if clocks are locked (if not there's a TCS problem)
-  if((gesica_SCR & 0x1) == 0) {
-    cerr << "TCS clock not locked: Status = 0x"
-         << hex << gesica_SCR << dec << endl;
-    exit(EXIT_FAILURE);
-  }
-  if((gesica_SCR & 0x2) == 0) {
-    cerr << "Internal clocks not locked. Status = 0x"
-         << hex << gesica_SCR << dec << endl;
-    exit(EXIT_FAILURE);
-  }
-
-  // Init connected iSADC cards
-  for(UInt_t port_id=0;port_id<6;port_id++) {
-    if( (gesica_SCR & (1 << (port_id+8))) == 0) {
-      cerr << "Port ID " << port_id << " not connected." << endl;
-      continue;
-    }
-    // set to broadcast mode
-    i2c_set_port(gesica, port_id, true);
-    // read hardwired id
-    UInt_t hard_id;
-    if(!i2c_read(gesica, 1, 0x0, hard_id))
-      continue;
-    // write geo id as port_id:
-    // hard_id as the lower 8 bits, port id the higher 8 bits!
-    if(!i2c_write(gesica, 2, 0x1, hard_id  + (port_id <<8)))
-      continue;
-    // readback geo id
-    UInt_t geo_id;
-    if(!i2c_read(gesica, 1, 0x1, geo_id))
-      continue;
-    if(geo_id != port_id) {
-      cerr << "Setting Geo ID for port " << port_id << " failed: GeoID=" << geo_id << endl;
-      continue;
-    }
-    cout << "Port ID=" << port_id << ", "
-         << "Hardwired ID=0x" << hex << hard_id << dec << ", "
-         << "Geo ID=0x" << hex << geo_id << dec
-         << endl;
-
-    // enable interface for readout (two VME accesses...)
-    *(gesica+0x20/4) |= 1 << (port_id+16);
-  }
   
   // set some registers
-  i2c_set_port(gesica, 0, false);
+  i2c_set_port(gesica, 0);
   i2c_write_reg(gesica, 0, 0x0, 0x45);
   i2c_write_reg(gesica, 0, 0x1, 0x5a);
 
   // read some registers
   for(UInt_t port_id=0;port_id<6;port_id++) {
     // no broadcast mode => access single SADCs?
-    i2c_set_port(gesica, port_id, false);
+    i2c_set_port(gesica, port_id);
 
     for(UInt_t reg=0x0;reg<0x3;reg++) {
       UInt_t data;
