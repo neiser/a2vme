@@ -168,6 +168,16 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer = fa
   if(!dump_spybuffer)
     return;
   
+  cout << "==== DUMPING SPYBUFFER (in hex) ====" << endl;
+  for(size_t i=0; i<spybuffer.size();i++) {
+    cout << hex 
+         << setfill('0') << setw(8)  
+         << i << " " 
+         << setfill('0') << setw(8)
+         << spybuffer[i] 
+         << dec << endl;
+  }  
+  cout << "==== END SPYBUFFER ====" << endl;
 }
 
 int main(int argc, char *argv[])
