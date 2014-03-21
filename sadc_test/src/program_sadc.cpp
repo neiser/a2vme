@@ -88,7 +88,7 @@ int main(int argc, char *argv[])
     exit (EXIT_FAILURE);      
   }
   
-  // open VME access to GeSiCa at 
+  // open VME access to GeSiCa at base_address
   vme32_t gesica = (vme32_t)vmestd(base_address, 0x1000);
   if (gesica == NULL) {
     cerr << "Error opening VME access to GeSiCa." << endl;
@@ -102,7 +102,8 @@ int main(int argc, char *argv[])
     exit (EXIT_FAILURE);
   }
   
-  cout << "GeSiCa found, clocks locked. Start programming..." << endl;
+  cout << "GeSiCa found, clocks locked. " 
+       << "Start programming " << ports.size() << " SADC modules..." << endl;
   
   for(size_t i=0; i<ports.size();i++) {
     cout << ">>>> Programming SADC at Port = " << ports[i] << endl;
