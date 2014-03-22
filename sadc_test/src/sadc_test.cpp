@@ -25,6 +25,32 @@ struct gesica_result_t {
   UInt_t EventIDTCS;
 };
 
+struct adc_header_t {
+  UInt_t ev_nr  : 12;
+  UInt_t blk_sz : 12;
+  UInt_t mode   : 1;
+  UInt_t ovfl   : 1;
+  UInt_t id     : 4;
+  UInt_t n_u    : 2;
+};
+
+struct adc_sample_t {
+  UInt_t val_0 : 10;
+  UInt_t val_1 : 10;
+  UInt_t val_2 : 10;
+  UInt_t n_u   : 2;
+};
+
+struct adc_integral_t {
+  UInt_t val   : 16;
+  UInt_t n_u_1 : 7;
+  UInt_t supp  : 1;
+  UInt_t n_u_2 : 2;
+  UInt_t ch_nr : 4;
+  UInt_t n_u_3 : 2;
+};
+
+
 // returns the 32bit words in the spybuffer, 
 // if some could be read...
 void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
@@ -180,8 +206,47 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
          << setfill('0') << setw(8)
          << spybuffer[i] 
          << dec << endl;
+
   }  
   cout << "==== END SPYBUFFER ====" << endl;
+  size_t i = 2;
+  while(i<spybuffer.size()-1) {
+    adc_header_t* hd = (adc_header_t*)(&spybuffer[i]); i++;
+    cout << "Header: ID=" << hd->id
+         << " Event=" << hd->ev_nr
+         << " Overflow=" << hd->ovfl
+         << endl;
+    UInt_t cnt = 1;
+    while(cnt < hd->blk_sz) {
+      // process latch all data
+      if(hd->mode == 0) {
+        UInt_t cnt_sample = 0;
+        while(cnt_sample < (hd->blk_sz-1)/16 - 3) {
+          adc_sample_t* s = (adc_sample_t*)(&spybuffer[i]); i++;
+          cout << "-> Sample0 " << s->val_0 << endl;
+          cout << "-> Sample1 " << s->val_1 << endl;
+          cout << "-> Sample2 " << s->val_2 << endl;
+          cnt_sample++;
+          cnt++;
+        }
+        cout << "--> Samples = " << cnt_sample*3 << endl;
+      }
+
+      // process sample integrals
+      for(size_t j=0;j<3;j++) {
+        adc_integral_t* adc_int = (adc_integral_t*)(&spybuffer[i]); i++;
+        cout << "--> Integral " << j
+             << ": Ch=" << adc_int->ch_nr
+             << " Val=" << adc_int->val
+             << " Supp=" << adc_int->supp
+             << endl;
+        cnt++;
+      }
+    }
+
+  }
+
+
 }
 
 int main(int argc, char *argv[])
