@@ -195,7 +195,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
     return;
   }
   
-  if(!dump_spybuffer)
+  if(!dump_spybuffer || spybuffer.size()<6)
     return;
   
   cout << "==== DUMPING SPYBUFFER (in hex) ====" << endl;
@@ -284,13 +284,13 @@ int main(int argc, char *argv[])
   }
 
   // enable only module 0 for readout
-  /*UInt_t status = *(gesica+0x20/4);
+  UInt_t status = *(gesica+0x20/4);
   status &= 0x01ffff;
   cout << "Gesica Status Reg 0x20=0x" << hex << status << dec << endl;
   *(gesica+0x20/4) = status;
   
   ports.clear();
-  ports.push_back(0);*/
+  ports.push_back(0);
 
   // set registers according to Igor
   for(UInt_t i=0;i<ports.size();i++) {
@@ -304,7 +304,7 @@ int main(int argc, char *argv[])
       // set latch all mode 
       // 0x0 = for firmware 100
       // 0x1 = for firmware 104 ???
-      i2c_write_reg(gesica, adc_side, 0x3, 0x1);
+      i2c_write_reg(gesica, adc_side, 0x3, 0x0);
       
       // set baseline integral
       i2c_write_reg(gesica, adc_side, 0x4, 0x0);
@@ -375,7 +375,7 @@ int main(int argc, char *argv[])
     
     // ******* START GESICA READOUT
     gesica_result_t r = {};
-    readout_gesica(gesica, r, false);
+    readout_gesica(gesica, r, true);
     // ******* END GESICA READOUT
     
     // Wait for Serial ID received, bit4 should become high
@@ -398,7 +398,7 @@ int main(int argc, char *argv[])
     // indicates that we've finished reading event
     *(vitec+0x6/2) = 0;
     
-    //break;
+    break;
     
   }
   
