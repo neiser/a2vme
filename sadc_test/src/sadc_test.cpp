@@ -27,7 +27,7 @@ struct gesica_result_t {
 
 // returns the 32bit words in the spybuffer, 
 // if some could be read...
-void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer = false) {
+void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
   // this is motivated by the SpyRead() method in TVME_GeSiCA.h
   
   // read status register,
@@ -57,6 +57,10 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer = fa
   // ...should be zero!
   if(header1 != 0x0) {
     r.ErrorCode |= 1 << 1;
+    cerr << "First header word not zero: 0x" << hex << header1 << dec  << endl;
+    if(header1 == 0xcfed1200) {
+      cerr << "Maybe no modules enabled in 0x20?" << endl;
+    }
     // reset module! can this harm?
     *(gesica+0x0/4) = 1;
     return;
@@ -154,7 +158,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer = fa
       spybuffer.push_back(datum);
       n++;
       if(n == 0x1000) {
-        r.ErrorCode |= 10;
+        r.ErrorCode |= 1 << 10;
         *(gesica+0x0/4) = 1;
         return;
       }
@@ -213,42 +217,45 @@ int main(int argc, char *argv[])
     cerr << "Detecting the SADC modules went wrong..." << endl;
     exit(EXIT_FAILURE);
   }
+
+  // enable only module 0 for readout
+  /*UInt_t status = *(gesica+0x20/4);
+  status &= 0x01ffff;
+  cout << "Gesica Status Reg 0x20=0x" << hex << status << dec << endl;
+  *(gesica+0x20/4) = status;
   
-  // enable readout via VME, but disable everything else like debugging pulsers
-  *(gesica+0x20/4) = 0x4;
-  
-  // only readout port 0 (init_gesica above enables all it can find)
-  
-  
+  ports.clear();
+  ports.push_back(0);*/
+
   // set registers according to Igor
   for(UInt_t i=0;i<ports.size();i++) {
     UInt_t port_id = ports[i];
     i2c_set_port(gesica, port_id);    
     for(UInt_t adc_side=0;adc_side<2;adc_side++) {
-      // set latency to 89=69+20, maybe we catch some NaI signals..
-      i2c_write_reg(gesica, adc_side, 0x0, 89);        
+      // set latency to 89=69+20, maybe we catch some NaI signals..?
+      i2c_write_reg(gesica, adc_side, 0x0, 0x45);
       // 10 samples per event
-      i2c_write_reg(gesica, adc_side, 0x1, 10);
+      i2c_write_reg(gesica, adc_side, 0x1, 0x5a);
       // set latch all mode 
       // 0x0 = for firmware 100
       // 0x1 = for firmware 104 ???
-      i2c_write_reg(gesica, adc_side, 0x3, 0);
+      i2c_write_reg(gesica, adc_side, 0x3, 0x1);
       
       // set baseline integral
-      i2c_write_reg(gesica, adc_side, 0x4, 0);
-      i2c_write_reg(gesica, adc_side, 0x5, 2);
+      i2c_write_reg(gesica, adc_side, 0x4, 0x0);
+      i2c_write_reg(gesica, adc_side, 0x5, 0x1e);
       
       // set signal integral
-      i2c_write_reg(gesica, adc_side, 0x6, 0);
-      i2c_write_reg(gesica, adc_side, 0x7, 10);
+      i2c_write_reg(gesica, adc_side, 0x6, 0x1e);
+      i2c_write_reg(gesica, adc_side, 0x7, 0x1e);
       
       // set tail integral
-      i2c_write_reg(gesica, adc_side, 0x8, 5);
-      i2c_write_reg(gesica, adc_side, 0x9, 5);      
+      i2c_write_reg(gesica, adc_side, 0x8, 0x3c);
+      i2c_write_reg(gesica, adc_side, 0x9, 0x1e);
             
       // set all thresholds to zero
       for(UInt_t reg=0x10;reg<0x20;reg++) {
-        i2c_write_reg(gesica, adc_side, reg, 0);        
+        i2c_write_reg(gesica, adc_side, reg, 0xf);
       }
     } 
   }
@@ -264,7 +271,7 @@ int main(int argc, char *argv[])
         i2c_read_reg(gesica, adc_side, reg, data);
         
         cout << "Port=" << port_id
-             << " ADC side=" << adc_side
+             << " ADCside=" << adc_side
              << hex << ": config 0x" << reg
              << "=0x" << data << dec << endl;
       }
@@ -274,12 +281,13 @@ int main(int argc, char *argv[])
         i2c_read_reg(gesica, adc_side, reg, data);
         
         cout << "Port=" << port_id
-             << " ADC side=" << adc_side
+             << " ADCside=" << adc_side
              << hex << ": threshold 0x" << reg
              << "=0x" << data << dec << endl;
       }
     }
   }
+
 
   // Set ACK of VITEC low by default
   *(vitec+0x6/2) = 0;
@@ -302,7 +310,7 @@ int main(int argc, char *argv[])
     
     // ******* START GESICA READOUT
     gesica_result_t r = {};
-    readout_gesica(gesica, r, true);
+    readout_gesica(gesica, r, false);
     // ******* END GESICA READOUT
     
     // Wait for Serial ID received, bit4 should become high
@@ -325,7 +333,7 @@ int main(int argc, char *argv[])
     // indicates that we've finished reading event
     *(vitec+0x6/2) = 0;
     
-    break;
+    //break;
     
   }
   

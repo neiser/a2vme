@@ -31,8 +31,6 @@ bool i2c_wait(vme32_t gesica, bool check_ack) {
 }
 
 bool i2c_reset(vme32_t gesica) {
-  // issue a reset, does also not help...
-  cout << "# Resetting i2c state machine..." << endl;
   *(gesica+0x48/4) = 0x40;
   return i2c_wait(gesica, false);
 }
@@ -197,10 +195,12 @@ bool init_gesica(vme32_t gesica,
     cerr << "Gesica firmware invalid, wrong address?" << endl;
     return false;
   }
-  
-  *(gesica+0x20/4) = 0x0; // disable everything by default
-  
-  // if the Gesica FPGA itself is programmed, 
+
+  // enable readout via VME, but disable everything else like debugging pulsers
+  // and all modules
+  *(gesica+0x20/4) = 0x4;
+
+  // if the Gesica FPGA itself is programmed,
   // the TCS (and thus i2c) might not be working...
   if(skip_i2c)
     return true;    
