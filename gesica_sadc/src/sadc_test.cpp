@@ -5,7 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <bitset>
-#include "gesica_lib.h"
+#include "gesica.h"
 
 extern "C" {
 #include "vmebus.h"
