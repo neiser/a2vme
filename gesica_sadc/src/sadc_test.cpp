@@ -23,6 +23,7 @@ struct gesica_result_t {
   UInt_t nFifoReads;
   UInt_t ErrorCode;
   UInt_t EventIDTCS;
+  bool DumpedWaveform;
 };
 
 struct adc_header_t {
@@ -136,7 +137,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
     
   }
   
-  if(r.nWordHeader > 0x1000) {
+  if(r.nWordHeader > 0x2000) {
     r.ErrorCode |= 1 << 2;
     *(gesica+0x0/4) = 1;
     return;
@@ -153,7 +154,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
     if(datum == 0xcfed1200) {
       break;
     }
-    else if(r.nFifoReads>0x1000) {
+    else if(r.nFifoReads>0x2000) {
       // this should never happen,
       // and it's a serious error
       r.ErrorCode |= 1 << 8;
@@ -183,7 +184,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
       UInt_t datum = *(gesica+0x28/4);
       spybuffer.push_back(datum);
       n++;
-      if(n == 0x1000) {
+      if(n == 0x2000) {
         r.ErrorCode |= 1 << 10;
         *(gesica+0x0/4) = 1;
         return;
@@ -195,10 +196,10 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
     return;
   }
   
-  if(!dump_spybuffer || spybuffer.size()<6)
+  if(!dump_spybuffer)
     return;
   
-  cout << "==== DUMPING SPYBUFFER (in hex) ====" << endl;
+  /*cout << "==== DUMPING SPYBUFFER (in hex) ====" << endl;
   for(size_t i=0; i<spybuffer.size();i++) {
     cout << hex 
          << setfill('0') << setw(8)  
@@ -208,45 +209,87 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
          << dec << endl;
 
   }  
-  cout << "==== END SPYBUFFER ====" << endl;
+  cout << "==== END SPYBUFFER ====" << endl;*/
+
   size_t i = 2;
+  const size_t numOfSamples = 3;
   while(i<spybuffer.size()-1) {
     adc_header_t* hd = (adc_header_t*)(&spybuffer[i]); i++;
-    cout << "Header: ID=" << hd->id
+    /*cout << "Header: ID=" << hd->id
          << " Event=" << hd->ev_nr
          << " Overflow=" << hd->ovfl
-         << endl;
+         << " Blocksize=" << hd->blk_sz
+         << endl;*/
     UInt_t cnt = 1;
     while(cnt < hd->blk_sz) {
       // process latch all data
+      vector<UInt_t> samples;
       if(hd->mode == 0) {
         UInt_t cnt_sample = 0;
-        while(cnt_sample < (hd->blk_sz-1)/16 - 3) {
+        while(cnt_sample < (hd->blk_sz-1)/16 - numOfSamples) {
           adc_sample_t* s = (adc_sample_t*)(&spybuffer[i]); i++;
-          cout << "-> Sample0 " << s->val_0 << endl;
+          /*cout << "-> Sample0 " << s->val_0 << endl;
           cout << "-> Sample1 " << s->val_1 << endl;
-          cout << "-> Sample2 " << s->val_2 << endl;
+          cout << "-> Sample2 " << s->val_2 << endl;*/
+          samples.push_back(s->val_0);
+          samples.push_back(s->val_1);
+          samples.push_back(s->val_2);
           cnt_sample++;
           cnt++;
         }
-        cout << "--> Samples = " << cnt_sample*3 << endl;
+        //cout << "--> Samples = " << cnt_sample*3 << endl;
       }
 
       // process sample integrals
-      for(size_t j=0;j<3;j++) {
+      bool supp = false;
+      UInt_t channel = 0;
+      for(size_t j=0;j<numOfSamples;j++) {
         adc_integral_t* adc_int = (adc_integral_t*)(&spybuffer[i]); i++;
-        cout << "--> Integral " << j
+        /*cout << "--> Integral " << j
              << ": Ch=" << adc_int->ch_nr
              << " Val=" << adc_int->val
              << " Supp=" << adc_int->supp
-             << endl;
+             << endl;*/
         cnt++;
+        // only dump something if not suppressed
+        // but do not break in order to cnt++ correctly
+        if(adc_int->supp)
+          supp = true;
+        // remember the channel
+        channel = adc_int->ch_nr;
+
       }
+
+
+      if(!supp) {
+        // dump some non-suppressed waveform
+        cout << "# ID=" << hd->id
+             << " Channel=" << channel << endl;
+        for(size_t j=0;j<samples.size();j++) {
+          cout << j << " " << samples[j] << endl;
+        }
+        cerr << "Dumped something..." << endl;
+      }
+
     }
 
   }
 
 
+}
+
+bool open_gesica(UInt_t base, vme32_t& gesica, vector<UInt_t>& ports) {
+  gesica = (vme32_t)vmestd((base << 12), 0x1000);
+  if (gesica == NULL) {
+    cerr << "Error opening VME access to GeSiCa." << endl;
+    return false;
+  }
+
+  if(!init_gesica(gesica, ports)) {
+    cerr << "Detecting the SADC modules went wrong..." << endl;
+    return false;
+  }
+  return true;
 }
 
 int main(int argc, char *argv[])
@@ -269,24 +312,21 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
   
-  // open VME access to GeSiCa at 
-  // base adress 0xdd1000 (vme-cb-adc-1a), size 0x1000
-  vme32_t gesica = (vme32_t)vmestd(0xdd1000, 0x1000);
-  if (gesica == NULL) {
-    cerr << "Error opening VME access to GeSiCa." << endl;
-    exit (EXIT_FAILURE);
-  }
-  
+  // open VME access to GeSiCa at 0xdd0, 0xdd1 or 0xdd2
+  vme32_t gesica = NULL;
   vector<UInt_t> ports;
-  if(!init_gesica(gesica, ports)) {
-    cerr << "Detecting the SADC modules went wrong..." << endl;
+  if(!open_gesica(0xdd0,gesica,ports) &&
+     !open_gesica(0xdd1,gesica,ports) &&
+     !open_gesica(0xdd2,gesica,ports)) {
+    cerr << "Couldnt find any gesica, exit..." << endl;
     exit(EXIT_FAILURE);
   }
+
 
   // enable only module 0 for readout
   UInt_t status = *(gesica+0x20/4);
   status &= 0x01ffff;
-  cout << "Gesica Status Reg 0x20=0x" << hex << status << dec << endl;
+  cout << "# Gesica Status Reg 0x20=0x" << hex << status << dec << endl;
   *(gesica+0x20/4) = status;
   
   ports.clear();
@@ -298,30 +338,36 @@ int main(int argc, char *argv[])
     i2c_set_port(gesica, port_id);    
     for(UInt_t adc_side=0;adc_side<2;adc_side++) {
       // set latency to 89=69+20, maybe we catch some NaI signals..?
-      i2c_write_reg(gesica, adc_side, 0x0, 0x45);
+      //i2c_write_reg(gesica, adc_side, 0x0, 0x45);
       // 10 samples per event
-      i2c_write_reg(gesica, adc_side, 0x1, 0x5a);
+      //i2c_write_reg(gesica, adc_side, 0x1, 0x5a);
       // set latch all mode 
-      // 0x0 = for firmware 100
-      // 0x1 = for firmware 104 ???
-      i2c_write_reg(gesica, adc_side, 0x3, 0x0);
+      // for 20140327 firmware
+      // (others support only bit0 and dump always 3 integrals)
+      // bit0: 1=sparse, 0=latch all (raw samples)
+      // bit1: 1=include 3 integrals, 0=disable
+      // bit2: 1=include difference "integral1-integral0", 0=disable
+      // 0x6=dump four "integrals" and raw samples
+      // 0x7=dump four "integrals"
+      // 0x2=dump three integrals and raw samples (works even with old firmware)
+      i2c_write_reg(gesica, adc_side, 0x3, 0x2);
       
       // set baseline integral
-      i2c_write_reg(gesica, adc_side, 0x4, 0x0);
-      i2c_write_reg(gesica, adc_side, 0x5, 0x1e);
+      //i2c_write_reg(gesica, adc_side, 0x4, 0x0);
+      //i2c_write_reg(gesica, adc_side, 0x5, 0x1e);
       
       // set signal integral
-      i2c_write_reg(gesica, adc_side, 0x6, 0x1e);
-      i2c_write_reg(gesica, adc_side, 0x7, 0x1e);
+      //i2c_write_reg(gesica, adc_side, 0x6, 0x1e);
+      //i2c_write_reg(gesica, adc_side, 0x7, 0x1e);
       
       // set tail integral
-      i2c_write_reg(gesica, adc_side, 0x8, 0x3c);
-      i2c_write_reg(gesica, adc_side, 0x9, 0x1e);
+      //i2c_write_reg(gesica, adc_side, 0x8, 0x3c);
+      //i2c_write_reg(gesica, adc_side, 0x9, 0x1e);
             
       // set all thresholds to zero
-      for(UInt_t reg=0x10;reg<0x20;reg++) {
-        i2c_write_reg(gesica, adc_side, reg, 0xf);
-      }
+      //for(UInt_t reg=0x10;reg<0x20;reg++) {
+      //  i2c_write_reg(gesica, adc_side, reg, 0xf);
+      //}
     } 
   }
   
@@ -335,7 +381,7 @@ int main(int argc, char *argv[])
         UInt_t data;
         i2c_read_reg(gesica, adc_side, reg, data);
         
-        cout << "Port=" << port_id
+        cout << "# Port=" << port_id
              << " ADCside=" << adc_side
              << hex << ": config 0x" << reg
              << "=0x" << data << dec << endl;
@@ -345,7 +391,7 @@ int main(int argc, char *argv[])
         UInt_t data;
         i2c_read_reg(gesica, adc_side, reg, data);
         
-        cout << "Port=" << port_id
+        cout << "# Port=" << port_id
              << " ADCside=" << adc_side
              << hex << ": threshold 0x" << reg
              << "=0x" << data << dec << endl;
@@ -385,7 +431,7 @@ int main(int argc, char *argv[])
     UInt_t EventID = *(vitec+0xa/2) << 16;
     EventID += *(vitec+0x8/2);
     
-    cout << EventID << " "
+    cout << "# " << EventID << " "
          << r.EventIDTCS << " "
          << r.nWordStatus << " "
          << r.nWordHeader << " "
@@ -398,7 +444,7 @@ int main(int argc, char *argv[])
     // indicates that we've finished reading event
     *(vitec+0x6/2) = 0;
     
-    break;
+    //break;
     
   }
   
