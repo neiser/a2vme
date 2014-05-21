@@ -199,7 +199,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
   if(!dump_spybuffer)
     return;
   
-  /*cout << "==== DUMPING SPYBUFFER (in hex) ====" << endl;
+  cout << "==== DUMPING SPYBUFFER (in hex) ====" << endl;
   for(size_t i=0; i<spybuffer.size();i++) {
     cout << hex 
          << setfill('0') << setw(8)  
@@ -209,10 +209,10 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
          << dec << endl;
 
   }  
-  cout << "==== END SPYBUFFER ====" << endl;*/
+  cout << "==== END SPYBUFFER ====" << endl;
 
   size_t i = 2;
-  const size_t numOfSamples = 3;
+  const size_t numOfSamples = 1;
   while(i<spybuffer.size()-1) {
     adc_header_t* hd = (adc_header_t*)(&spybuffer[i]); i++;
     /*cout << "Header: ID=" << hd->id
@@ -261,7 +261,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
       }
 
 
-      if(!supp) {
+      //if(!supp) {
         // dump some non-suppressed waveform
         cout << "# ID=" << hd->id
              << " Channel=" << channel << endl;
@@ -269,7 +269,7 @@ void readout_gesica(vme32_t gesica, gesica_result_t& r, bool dump_spybuffer) {
           cout << j << " " << samples[j] << endl;
         }
         cerr << "Dumped something..." << endl;
-      }
+      //}
 
     }
 
@@ -324,13 +324,13 @@ int main(int argc, char *argv[])
 
 
   // enable only module 0 for readout
-  UInt_t status = *(gesica+0x20/4);
+  /*UInt_t status = *(gesica+0x20/4);
   status &= 0x01ffff;
   cout << "# Gesica Status Reg 0x20=0x" << hex << status << dec << endl;
   *(gesica+0x20/4) = status;
   
   ports.clear();
-  ports.push_back(0);
+  ports.push_back(0);*/
 
   // set registers according to Igor
   for(UInt_t i=0;i<ports.size();i++) {
@@ -338,10 +338,11 @@ int main(int argc, char *argv[])
     i2c_set_port(gesica, port_id);    
     for(UInt_t adc_side=0;adc_side<2;adc_side++) {
       // set latency to 89=69+20, maybe we catch some NaI signals..?
-      //i2c_write_reg(gesica, adc_side, 0x0, 0x45);
-      // 10 samples per event
-      //i2c_write_reg(gesica, adc_side, 0x1, 0x5a);
-      // set latch all mode 
+      i2c_write_reg(gesica, adc_side, 0x0, 0x45);
+      //i2c_write_reg(gesica, adc_side, 0x0, 92);
+      // 90 samples per event
+      i2c_write_reg(gesica, adc_side, 0x1, 0x5a);
+      // set latch all mode
       // for 20140327 firmware
       // (others support only bit0 and dump always 3 integrals)
       // bit0: 1=sparse, 0=latch all (raw samples)
@@ -350,24 +351,25 @@ int main(int argc, char *argv[])
       // 0x6=dump four "integrals" and raw samples
       // 0x7=dump four "integrals"
       // 0x2=dump three integrals and raw samples (works even with old firmware)
-      i2c_write_reg(gesica, adc_side, 0x3, 0x2);
+      i2c_write_reg(gesica, adc_side, 0x3, 0x5);
       
       // set baseline integral
-      //i2c_write_reg(gesica, adc_side, 0x4, 0x0);
-      //i2c_write_reg(gesica, adc_side, 0x5, 0x1e);
+      i2c_write_reg(gesica, adc_side, 0x4, 0x0);
+      i2c_write_reg(gesica, adc_side, 0x5, 0x1e);
       
       // set signal integral
-      //i2c_write_reg(gesica, adc_side, 0x6, 0x1e);
-      //i2c_write_reg(gesica, adc_side, 0x7, 0x1e);
+      i2c_write_reg(gesica, adc_side, 0x6, 0x1e);
+      i2c_write_reg(gesica, adc_side, 0x7, 0x1e);
       
       // set tail integral
-      //i2c_write_reg(gesica, adc_side, 0x8, 0x3c);
-      //i2c_write_reg(gesica, adc_side, 0x9, 0x1e);
+      i2c_write_reg(gesica, adc_side, 0x8, 0x3c);
+      i2c_write_reg(gesica, adc_side, 0x9, 0x1e);
             
       // set all thresholds to zero
-      //for(UInt_t reg=0x10;reg<0x20;reg++) {
-      //  i2c_write_reg(gesica, adc_side, reg, 0xf);
-      //}
+      for(UInt_t reg=0x10;reg<0x20;reg++) {
+        i2c_write_reg(gesica, adc_side, reg, 0xf);
+        //i2c_write_reg(gesica, adc_side, reg, 25);
+      }
     } 
   }
   
@@ -399,6 +401,7 @@ int main(int argc, char *argv[])
     }
   }
 
+  exit(EXIT_SUCCESS);
 
   // Set ACK of VITEC low by default
   *(vitec+0x6/2) = 0;
@@ -444,7 +447,7 @@ int main(int argc, char *argv[])
     // indicates that we've finished reading event
     *(vitec+0x6/2) = 0;
     
-    //break;
+    break;
     
   }
   
