@@ -19,17 +19,18 @@ bool program_sadc(vme32_t gesica, const vector<UInt_t>& rbt_data) {
   // reset FPGA
   if(!i2c_write(gesica, 1, 2, 0x0))
     return false;
-  
+
   // set program bit = bit2
   if(!i2c_write(gesica, 1, 2, 0x4))
     return false;
-  
+
   // wait for init
   UInt_t nTries = 0;
   UInt_t status = 0;
   do {
     if(!i2c_read(gesica, 1, 2, status))
       return false;
+    //cout << "wait... 0x" << hex << status << dec << " " << nTries << endl;
     nTries++;
     if(nTries==10000) {
       cerr << "Reached maximum wait time for init programming. "
@@ -38,6 +39,7 @@ bool program_sadc(vme32_t gesica, const vector<UInt_t>& rbt_data) {
     }
   }
   while((status & 0x1) == 0);
+  
   
   // write the file, 2 bytes at once
   cout << "Programming SADC..." << endl;
@@ -51,14 +53,13 @@ bool program_sadc(vme32_t gesica, const vector<UInt_t>& rbt_data) {
       cout << "." << flush;
   }
   cout << endl;
-  
-  
+    
   // check status, bit1 = FPGA0 done, bit3 = FPGA1 done
   if(!i2c_read(gesica, 1, 2, status))
     return false;
   if(status != 0xe) {
-    cerr << "Status = " << hex << status  << dec
-         << " != 0xe (not both FPGAs indicate DONE), programming failed." << endl;
+    cerr << "Status = 0x" << hex << status  << dec
+	 << " != 0xe (not both FPGAs indicate DONE), programming failed." << endl;
     return false;
   }
   
@@ -104,13 +105,16 @@ int main(int argc, char *argv[])
   
   cout << "GeSiCa found, clocks locked. " 
        << "Start programming " << ports.size() << " SADC modules..." << endl;
-  
+
   for(size_t i=0; i<ports.size();i++) {
     cout << ">>>> Programming SADC at Port = " << ports[i] << endl;
     i2c_set_port(gesica, ports[i]);
     if(!program_sadc(gesica, rbt_data)) {
-      cerr << "Could not successfully program, exit." << endl;
-      exit(EXIT_FAILURE);
+      cerr << "Try reprogramming, sometimes necessary after GeSiCa reprogramming..." << endl;
+      if(!program_sadc(gesica, rbt_data)) {
+	cerr << "Could not successfully program, exit." << endl;
+	exit(EXIT_FAILURE);
+      }
     }
   }
   

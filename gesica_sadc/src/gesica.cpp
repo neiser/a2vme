@@ -5,6 +5,7 @@
 #include <fstream>
 #include <sstream>
 #include <bitset>
+#include <unistd.h>
 
 #include "gesica.h"
 
@@ -14,7 +15,7 @@ using namespace std;
 bool i2c_wait(vme32_t gesica, bool check_ack) {
   // poll status register 0x4c bit 0,
   // wait until deasserted
-  for(UInt_t n=0;n<100;n++) {
+  for(UInt_t n=0;n<1000;n++) {
     UInt_t status = *(gesica+0x4c/4);
     if((status & 0x1) == 0) {
       //cout << "# After " << n << " reads: 0x4c = 0x" << hex << (status & 0x7f) << dec << endl;
@@ -219,43 +220,72 @@ bool init_gesica(vme32_t gesica,
     return false;
   }
   
-  // reset the i2c...
-  if(!i2c_reset(gesica)) {
-    cerr << "I2C reset failed" << endl;
-    return false;
+  UInt_t init_tries = 10;
+  do {
+    ports.clear();
+    bool problem_found = false;
+    // Init connected iSADC cards
+    gesica_SCR = *(gesica+0x20/4);
+    for(UInt_t port_id=0;port_id<8;port_id++) {
+      if( (gesica_SCR & (1 << (port_id+8))) == 0) {
+	//cout << "Ignored..." << endl;
+	// silently ignore unconnected cards...
+	continue;
+      }
+      // set to broadcast mode
+      //cout << "Set port" << endl;
+      i2c_set_port(gesica, port_id, true);
+      // read hardwired id
+      //cout << "Read hardwired id" << endl;
+      UInt_t hard_id;
+      if(!i2c_read(gesica, 1, 0x0, hard_id)) {
+	problem_found = true;
+	continue; 
+      }
+      // write geo id as port_id:
+      // hard_id as the lower 8 bits, port id the higher 8 bits!
+      //cout << "Set geo id" << endl;
+      if(!i2c_write(gesica, 2, 0x1, hard_id  + (port_id <<8))) {
+	problem_found = true;
+	continue;
+      }
+      // readback geo id
+      //cout << "Readback geo id" << endl;
+      UInt_t geo_id;
+      if(!i2c_read(gesica, 1, 0x1, geo_id)) {
+	problem_found = true;
+	continue;
+      }
+      if(geo_id != port_id) {
+	problem_found = true;
+	cerr << "Setting Geo ID for port " << port_id << " failed: GeoID=" << geo_id << endl;
+	continue;
+      }
+      //cout << "Found..." << endl;
+      ports.push_back(port_id);
+      // enable interface for readout (two VME accesses, too lazy too use bitset here...)
+      *(gesica+0x20/4) |= 1 << (port_id+16);
+    }
+    init_tries--;
+
+    if(!problem_found)
+      break;
+    
+    if(init_tries==0) {
+      cerr << "No tries left for initing all connected SADC modules" << endl;
+      return false;
+    }
+    cerr << "Retrying initing the SADC modules. Sometimes necessary after GeSiCa reprogramming." << endl;
+
+    // give the Gesica some time to find the modules...
+    usleep(10000);
   }
+  while(init_tries>0);
   
-  // Init connected iSADC cards
-  for(UInt_t port_id=0;port_id<8;port_id++) {
-    if( (gesica_SCR & (1 << (port_id+8))) == 0) {
-      // silently ignore unconnected cards...
-      continue;
-    }
-    // set to broadcast mode
-    i2c_set_port(gesica, port_id, true);
-    // read hardwired id
-    UInt_t hard_id;
-    if(!i2c_read(gesica, 1, 0x0, hard_id))
-      continue;
-    // write geo id as port_id:
-    // hard_id as the lower 8 bits, port id the higher 8 bits!
-    if(!i2c_write(gesica, 2, 0x1, hard_id  + (port_id <<8)))
-      continue;
-    // readback geo id
-    UInt_t geo_id;
-    if(!i2c_read(gesica, 1, 0x1, geo_id))
-      continue;
-    if(geo_id != port_id) {
-      cerr << "Setting Geo ID for port " << port_id << " failed: GeoID=" << geo_id << endl;
-      continue;
-    }
-    ports.push_back(port_id);
-    // enable interface for readout (two VME accesses, too lazy too use bitset here...)
-    *(gesica+0x20/4) |= 1 << (port_id+16);
-  }
   if(ports.empty()) {
     cerr << "No connected SADC modules found." << endl;
     return false;
   }
+
   return true;
 }
